@@ -52,14 +52,15 @@ export default function RegisterAssetPage() {
 
       // 2. DB insert 부분 수정 (이 부분을 아래처럼 수정하세요!)
       const { data, error: dbError } = await supabase
-        .from('assets')
-        .insert([{ 
-          barcode: barcode, 
-          model_name: modelName, 
-          asset_image: finalImageUrl,
-          status: '미점검'
-        }])
-        .select(); // 성공 시 데이터를 반환받아 에러를 더 명확히 확인합니다.
+  .from('assets')
+  .upsert([ // .insert 대신 .upsert를 사용합니다!
+    { 
+      barcode: barcode, 
+      model_name: modelName, 
+      asset_image: finalImageUrl,
+      status: '미점검' 
+    }
+  ], { onConflict: 'barcode' }); // 성공 시 데이터를 반환받아 에러를 더 명확히 확인합니다.
 
       if (dbError) {
         // 에러 발생 시 상세 정보 출력
