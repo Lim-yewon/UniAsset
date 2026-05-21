@@ -68,6 +68,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {role === 'admin' && (
               <>
                 <p className="text-xs font-bold text-gray-500 mt-6 mb-2">ADMINISTRATION</p>
+                <Link href="/register" className="hover:bg-gray-800 p-3 rounded-lg transition flex items-center gap-3 text-sky-400">
+  ➕ 신규 기자재 등록
+</Link>
                 <Link href="/admin" className="hover:bg-gray-800 p-3 rounded-lg transition flex items-center gap-3 text-purple-400">
                   📊 전체 자산 관리 대장
                 </Link>
