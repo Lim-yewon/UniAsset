@@ -12,7 +12,7 @@ export default function AuthManagePage() {
     // 1. 학생 목록 가져오기
     // 관계형 조인은 테이블 이름이 DB에 저장된 그대로(보통 대소문자 구분) 입력해야 합니다.
     const { data: studentData, error } = await supabase
-      .from('Student')
+      .from('student')
       .select(`
         student_id,
         User (
@@ -27,7 +27,7 @@ export default function AuthManagePage() {
     }
       
       // 2. 호실 목록 가져오기
-      const { data: roomData } = await supabase.from('Room').select('*');
+      const { data: roomData } = await supabase.from('room').select('*');
       
       if (studentData) setStudents(studentData);
       if (roomData) setRooms(roomData);
