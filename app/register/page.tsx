@@ -20,45 +20,63 @@ export default function RegisterAssetPage() {
   };
 
   // 2. 폼 제출: 스토리지에 사진 올리고 -> DB에 데이터 저장하기
+  // 2. 폼 제출: 스토리지에 사진 올리고 -> DB에 데이터 저장하기
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!barcode || !modelName) {
+      alert('바코드와 모델명을 입력해주세요.');
+      return;
+    }
+
     setIsUploading(true);
+    let finalImageUrl = null;
 
     try {
-      let finalImageUrl = null;
+      // 1. 사진 파일 업로드 로직 (기존과 동일)
       if (imageFile) {
-        const fileName = `${Date.now()}`;
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+
         const { error: uploadError } = await supabase.storage
           .from('asset_images')
           .upload(fileName, imageFile);
+
         if (uploadError) throw uploadError;
-        
+
         const { data: publicUrlData } = supabase.storage
           .from('asset_images')
           .getPublicUrl(fileName);
+          
         finalImageUrl = publicUrlData.publicUrl;
       }
 
-      // DB insert: 에러가 나면 콘솔에 상세히 출력하도록 수정
+      // 2. DB insert 부분 수정 (이 부분을 아래처럼 수정하세요!)
       const { data, error: dbError } = await supabase
         .from('assets')
         .insert([{ 
           barcode: barcode, 
           model_name: modelName, 
           asset_image: finalImageUrl,
-          status: '미점검' 
+          status: '미점검'
         }])
-        .select(); // <--- 이걸 추가하면 DB가 성공 후 데이터를 돌려줍니다
+        .select(); // 성공 시 데이터를 반환받아 에러를 더 명확히 확인합니다.
 
       if (dbError) {
-        console.error("DB 상세 에러:", dbError); // F12 콘솔에서 이 메시지를 확인하세요!
+        // 에러 발생 시 상세 정보 출력
+        console.error("DB 상세 에러:", dbError);
         throw dbError;
       }
 
       alert('✅ 등록 완료!');
+      setBarcode('');
+      setModelName('');
+      setImageFile(null);
+      setPreviewUrl(null);
+
     } catch (error) {
+      // 전체 에러 출력
       console.error("전체 에러:", error);
-      alert('❌ 등록 실패: 콘솔(F12)의 에러 상세 내용을 확인하세요.');
+      alert('❌ 등록 실패: F12(개발자도구)의 콘솔창에서 상세 에러를 확인하세요.');
     } finally {
       setIsUploading(false);
     }
