@@ -1,58 +1,59 @@
 'use client';
 
 import React, { useState } from 'react';
-import BarcodeScannerComponent from 'react-qr-barcode-scanner';
+import { useZxing } from 'react-zxing';
 
 export default function ScannerPage() {
-  const [scannedData, setScannedData] = useState('바코드를 화면에 비춰주세요');
-  const [isScanning, setIsScanning] = useState(true);
+  const [scannedData, setScannedData] = useState('');
+  const [manualInput, setManualInput] = useState('');
+
+  // onDecodeResult를 onResult로 변경합니다.
+  const { ref } = useZxing({
+    onResult(result: any) { 
+      setScannedData(result.getText());
+    },
+  });
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
       <h1 className="text-2xl font-bold mb-6 text-blue-700">UniAsset 재물조사 스캐너</h1>
       
-      {/* 카메라 화면 영역 */}
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl shadow-xl border-4 border-white relative">
-        {/* 스캔 가이드라인 (시각적 효과) */}
-        <div className="absolute inset-0 border-2 border-red-500 opacity-50 m-12 rounded pointer-events-none z-10"></div>
-        
-        {isScanning ? (
-          <BarcodeScannerComponent
-            width={500}
-            height={500}
-            onUpdate={(err, result) => {
-              if (result) {
-                // 스캔에 성공하면 글자를 바꾸고 카메라를 잠시 멈춥니다.
-                setScannedData(result.getText());
-                setIsScanning(false); 
-              }
-            }}
+      {/* 1. 카메라 스캔 영역 */}
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl shadow-lg border-4 border-white relative mb-6">
+        <video ref={ref} className="w-full h-64 object-cover" />
+        <div className="absolute inset-0 border-2 border-red-500 opacity-50 m-8 rounded pointer-events-none z-10"></div>
+        <p className="absolute bottom-2 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-50 py-1">
+          빨간 네모 안에 바코드를 맞춰주세요
+        </p>
+      </div>
+
+      {/* 2. 스캔 결과 표시 영역 */}
+      <div className="p-4 bg-white rounded-lg shadow-md w-full max-w-sm text-center border-2 border-blue-100 mb-6">
+        <p className="text-sm text-gray-500 mb-2">스캔된 바코드 번호</p>
+        <p className="text-2xl font-bold text-blue-600 break-all">
+          {scannedData || '대기 중...'}
+        </p>
+      </div>
+
+      {/* 3. 비상용 수기 입력 영역 (카메라 인식 실패 시) */}
+      <div className="w-full max-w-sm p-4 bg-gray-200 rounded-lg shadow-inner">
+        <p className="text-sm text-gray-600 mb-2 font-semibold">바코드 인식이 안 되나요?</p>
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            placeholder="바코드 하단 번호 입력" 
+            className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-        ) : (
-          <div className="w-full h-64 bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-500 font-semibold">스캔 완료!</span>
-          </div>
-        )}
+          <button 
+            onClick={() => setScannedData(manualInput)}
+            className="px-4 py-2 bg-gray-700 text-white font-bold rounded-md hover:bg-gray-800 transition"
+          >
+            입력
+          </button>
+        </div>
       </div>
-
-      {/* 스캔 결과 출력 영역 */}
-      <div className="mt-8 p-4 bg-white rounded-lg shadow-md w-full max-w-sm text-center border-2 border-blue-100">
-        <p className="text-sm text-gray-500 mb-2">스캔된 바코드/QR 번호</p>
-        <p className="text-2xl font-bold text-blue-600 break-all">{scannedData}</p>
-      </div>
-
-      {/* 다시 스캔하기 버튼 */}
-      {!isScanning && (
-        <button 
-          onClick={() => { 
-            setScannedData('바코드를 화면에 비춰주세요'); 
-            setIsScanning(true); 
-          }}
-          className="mt-6 px-8 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 transition"
-        >
-          다음 기자재 스캔하기
-        </button>
-      )}
     </div>
   );
 }
