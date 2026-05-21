@@ -8,24 +8,32 @@ export default function AdminFaultsPage() {
 
   useEffect(() => {
     const fetchReports = async () => {
-      const { data } = await supabase.from('fault_reports').select('*').order('reported_at', { ascending: false });
+      const { data } = await supabase
+        .from('fault_reports')
+        .select('*')
+        .order('reported_at', { ascending: false });
       if (data) setReports(data);
     };
     fetchReports();
   }, []);
 
-  // 🌟 [추가] 상태 업데이트 함수
-  const updateStatus = async (id: number, newStatus: string) => {
+  // 1. 상태 변경 시 로컬 데이터만 우선 수정
+  const handleStatusChange = (id: number, value: string) => {
+    setReports(reports.map(r => r.id === id ? { ...r, status: value } : r));
+  };
+
+  // 2. 저장 버튼 클릭 시 DB에 반영
+  const saveStatus = async (id: number) => {
+    const report = reports.find(r => r.id === id);
     const { error } = await supabase
       .from('fault_reports')
-      .update({ status: newStatus })
+      .update({ status: report.status })
       .eq('id', id);
 
     if (error) {
-      alert('상태 변경에 실패했습니다.');
+      alert('❌ 저장 실패: ' + error.message);
     } else {
-      // 성공 시 화면 즉시 반영
-      setReports(reports.map(r => r.id === id ? { ...r, status: newStatus } : r));
+      alert('✅ 상태가 업데이트되었습니다.');
     }
   };
 
@@ -38,7 +46,7 @@ export default function AdminFaultsPage() {
             <tr>
               <th className="p-4">바코드</th>
               <th className="p-4">신고 사유</th>
-              <th className="p-4">상태</th>
+              <th className="p-4">상태 관리</th>
             </tr>
           </thead>
           <tbody>
@@ -46,17 +54,22 @@ export default function AdminFaultsPage() {
               <tr key={r.id} className="border-b">
                 <td className="p-4 font-mono">{r.barcode}</td>
                 <td className="p-4">{r.reason}</td>
-                {/* 🌟 [수정] 드롭다운으로 변경 */}
-                <td className="p-4">
+                <td className="p-4 flex gap-2 items-center">
                   <select 
                     value={r.status} 
-                    onChange={(e) => updateStatus(r.id, e.target.value)}
+                    onChange={(e) => handleStatusChange(r.id, e.target.value)}
                     className="border rounded-lg p-2 text-sm bg-white cursor-pointer hover:border-blue-500"
                   >
                     <option value="접수대기">접수대기</option>
                     <option value="수리중">수리중</option>
                     <option value="수리완료">수리완료</option>
                   </select>
+                  <button 
+                    onClick={() => saveStatus(r.id)}
+                    className="bg-sky-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-sky-700 transition"
+                  >
+                    저장
+                  </button>
                 </td>
               </tr>
             ))}
