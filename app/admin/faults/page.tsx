@@ -14,6 +14,21 @@ export default function AdminFaultsPage() {
     fetchReports();
   }, []);
 
+  // 🌟 [추가] 상태 업데이트 함수
+  const updateStatus = async (id: number, newStatus: string) => {
+    const { error } = await supabase
+      .from('fault_reports')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      alert('상태 변경에 실패했습니다.');
+    } else {
+      // 성공 시 화면 즉시 반영
+      setReports(reports.map(r => r.id === id ? { ...r, status: newStatus } : r));
+    }
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">🛠️ 고장 신고 관리 대시보드</h1>
@@ -31,7 +46,18 @@ export default function AdminFaultsPage() {
               <tr key={r.id} className="border-b">
                 <td className="p-4 font-mono">{r.barcode}</td>
                 <td className="p-4">{r.reason}</td>
-                <td className="p-4"><span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">{r.status}</span></td>
+                {/* 🌟 [수정] 드롭다운으로 변경 */}
+                <td className="p-4">
+                  <select 
+                    value={r.status} 
+                    onChange={(e) => updateStatus(r.id, e.target.value)}
+                    className="border rounded-lg p-2 text-sm bg-white cursor-pointer hover:border-blue-500"
+                  >
+                    <option value="접수대기">접수대기</option>
+                    <option value="수리중">수리중</option>
+                    <option value="수리완료">수리완료</option>
+                  </select>
+                </td>
               </tr>
             ))}
           </tbody>
