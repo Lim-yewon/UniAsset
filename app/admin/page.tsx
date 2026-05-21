@@ -5,51 +5,57 @@ import { supabase } from '../../lib/supabase';
 
 export default function AdminPage() {
   const [assets, setAssets] = useState<any[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     const getData = async () => {
-      // 기존 복잡했던 .select()를 아래처럼 '*'로 수정하세요
-    const { data, error } = await supabase
-    .from('assets')
-    .select('*'); // 모든 컬럼을 가져오라는 뜻입니다.
-        if (data) setAssets(data);
-        };
+      const { data } = await supabase.from('assets').select('*').order('asset_id');
+      if (data) setAssets(data);
+    };
     getData();
   }, []);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">자산 관리 대장</h1>
-        <button onClick={()=>window.location.reload()} className="text-sm bg-white border px-4 py-2 rounded-lg shadow-sm">새로고침 🔄</button>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-800">자산 관리 대장</h1>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="p-4 font-semibold text-gray-600">ID</th>
-              <th className="p-4 font-semibold text-gray-600">바코드</th>
-              <th className="p-4 font-semibold text-gray-600">모델명</th>
-              <th className="p-4 font-semibold text-gray-600">상태</th>
-            </tr>
-          </thead>
+          {/* ... (thead 부분 동일) ... */}
           <tbody>
             {assets.map(asset => (
-              <tr key={asset.asset_id} className="border-b last:border-0 hover:bg-gray-50 transition">
+              <tr key={asset.asset_id} className="border-b hover:bg-gray-50">
                 <td className="p-4 text-gray-500">{asset.asset_id}</td>
-                <td className="p-4 font-mono font-bold text-blue-600">{asset.barcode}</td>
-                <td className="p-4 text-gray-800">{asset.model_name}</td>
+                <td className="p-4 font-bold text-blue-600">{asset.barcode}</td>
+                <td className="p-4">{asset.model_name}</td>
                 <td className="p-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${asset.status === '점검완료' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {asset.status || '미점검'}
-                  </span>
+                  {/* 🌟 이미지 보기 버튼 */}
+                  {asset.asset_image ? (
+                    <button 
+                      onClick={() => setSelectedImage(asset.asset_image)}
+                      className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-blue-200"
+                    >
+                      이미지 보기
+                    </button>
+                  ) : (
+                    <span className="text-gray-300 text-xs">사진 없음</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* 🌟 이미지 모달창 (클릭 시 나타남) */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedImage(null)}>
+          <div className="bg-white p-2 rounded-xl shadow-2xl max-w-lg w-full">
+            <img src={selectedImage} alt="자산 이미지" className="w-full h-auto rounded-lg" />
+            <button className="w-full mt-2 py-2 text-sm font-bold text-gray-500" onClick={() => setSelectedImage(null)}>닫기</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
