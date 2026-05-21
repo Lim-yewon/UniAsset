@@ -37,7 +37,7 @@ export default function AuthManagePage() {
 
   const handleAssign = async (studentId: string, roomId: number) => {
     const { error } = await supabase
-      .from('Authorization')
+      .from('authorization')
       .insert([{ 
         staff_id: 'staff_001', // 현재 로그인된 관리자 ID (테스트용 고정)
         student_id: studentId, 
