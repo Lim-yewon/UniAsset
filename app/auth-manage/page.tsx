@@ -9,10 +9,22 @@ export default function AuthManagePage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. 학생 목록 가져오기 (User 테이블과 조인)
-      const { data: studentData } = await supabase
-        .from('Student')
-        .select(`*, User(name)`);
+    // 1. 학생 목록 가져오기
+    // 관계형 조인은 테이블 이름이 DB에 저장된 그대로(보통 대소문자 구분) 입력해야 합니다.
+    const { data: studentData, error } = await supabase
+      .from('Student')
+      .select(`
+        student_id,
+        User (
+          name
+        )
+      `);
+    
+    if (error) console.error("학생 조회 에러:", error);
+    else {
+      console.log("조회된 학생 데이터:", studentData); // 🌟 여기서 콘솔을 꼭 확인하세요!
+      setStudents(studentData || []);
+    }
       
       // 2. 호실 목록 가져오기
       const { data: roomData } = await supabase.from('Room').select('*');
