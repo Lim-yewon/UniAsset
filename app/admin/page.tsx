@@ -8,9 +8,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     const getData = async () => {
-      const { data } = await supabase.from('assets').select('*').order('asset_id');
-      if (data) setAssets(data);
-    };
+      // 기존 복잡했던 .select()를 아래처럼 '*'로 수정하세요
+    const { data, error } = await supabase
+    .from('assets')
+    .select('*'); // 모든 컬럼을 가져오라는 뜻입니다.
+        if (data) setAssets(data);
+        };
     getData();
   }, []);
 
