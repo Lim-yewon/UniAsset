@@ -65,14 +65,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             )}
 
             {/* 4. 관리자 (교직원) 전용 메뉴 */}
+            {/* 4. 관리자 (교직원) 전용 메뉴 */}
             {role === 'admin' && (
               <>
                 <p className="text-xs font-bold text-gray-500 mt-6 mb-2">ADMINISTRATION</p>
                 <Link href="/register" className="hover:bg-gray-800 p-3 rounded-lg transition flex items-center gap-3 text-sky-400">
-  ➕ 신규 기자재 등록
-</Link>
+                  ➕ 신규 기자재 등록
+                </Link>
                 <Link href="/admin" className="hover:bg-gray-800 p-3 rounded-lg transition flex items-center gap-3 text-purple-400">
                   📊 전체 자산 관리 대장
+                </Link>
+                {/* 🌟 여기에 추가하세요! */}
+                <Link href="/admin/faults" className="hover:bg-gray-800 p-3 rounded-lg transition flex items-center gap-3 text-red-400">
+                  🛠️ 고장 신고 관리
                 </Link>
                 <Link href="/auth-manage" className="hover:bg-gray-800 p-3 rounded-lg transition flex items-center gap-3 text-purple-400">
                   🔑 권한 및 근로 배정
