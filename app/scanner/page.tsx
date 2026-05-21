@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useZxing } from 'react-zxing';
 // 🌟 우리가 만들어둔 Supabase 연결 다리 불러오기
-import { supabase } from '../lib/supabase'; 
+import { supabase } from '../../lib/supabase';
 
 export default function ScannerPage() {
   const [scannedData, setScannedData] = useState('');
