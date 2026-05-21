@@ -22,59 +22,43 @@ export default function RegisterAssetPage() {
   // 2. 폼 제출: 스토리지에 사진 올리고 -> DB에 데이터 저장하기
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!barcode || !modelName) {
-      alert('바코드와 모델명을 입력해주세요.');
-      return;
-    }
-
     setIsUploading(true);
-    let finalImageUrl = null;
 
     try {
-      // 사진 파일이 첨부되었다면 Supabase Storage에 먼저 업로드
+      let finalImageUrl = null;
       if (imageFile) {
-        // 파일 이름이 겹치지 않게 무작위 숫자(날짜)를 붙여줍니다.
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const fileName = `${Date.now()}`;
+        const { error: uploadError } = await supabase.storage
           .from('asset_images')
           .upload(fileName, imageFile);
-
         if (uploadError) throw uploadError;
-
-        // 업로드 성공 시, 웹에서 볼 수 있는 절대 주소(Public URL)를 가져옵니다.
+        
         const { data: publicUrlData } = supabase.storage
           .from('asset_images')
           .getPublicUrl(fileName);
-          
         finalImageUrl = publicUrlData.publicUrl;
       }
 
-      // DB의 assets 테이블에 최종 저장 (장비이미지 주소 포함)
-      // 2단계의 handleSubmit 함수 내부를 이렇게 바꿔보세요
-const { error: dbError } = await supabase
-  .from('assets')
-  .insert([{ 
-    barcode: barcode, 
-    model_name: modelName, 
-    asset_image: finalImageUrl,
-    status: '미점검'
-    // 만약 DB 테이블에 'category'나 다른 필수 컬럼이 있다면 여기에 추가하세요
-  }]);
+      // DB insert: 에러가 나면 콘솔에 상세히 출력하도록 수정
+      const { data, error: dbError } = await supabase
+        .from('assets')
+        .insert([{ 
+          barcode: barcode, 
+          model_name: modelName, 
+          asset_image: finalImageUrl,
+          status: '미점검' 
+        }])
+        .select(); // <--- 이걸 추가하면 DB가 성공 후 데이터를 돌려줍니다
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error("DB 상세 에러:", dbError); // F12 콘솔에서 이 메시지를 확인하세요!
+        throw dbError;
+      }
 
-      alert('✅ 기자재 등록 및 이미지 업로드가 완료되었습니다!');
-      // 폼 초기화
-      setBarcode('');
-      setModelName('');
-      setImageFile(null);
-      setPreviewUrl(null);
-
+      alert('✅ 등록 완료!');
     } catch (error) {
-      console.error(error);
-      alert('❌ 업로드 중 오류가 발생했습니다.');
+      console.error("전체 에러:", error);
+      alert('❌ 등록 실패: 콘솔(F12)의 에러 상세 내용을 확인하세요.');
     } finally {
       setIsUploading(false);
     }
