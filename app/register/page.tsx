@@ -52,14 +52,16 @@ export default function RegisterAssetPage() {
       }
 
       // DB의 assets 테이블에 최종 저장 (장비이미지 주소 포함)
-      const { error: dbError } = await supabase
-        .from('assets')
-        .insert([{ 
-          barcode: barcode, 
-          model_name: modelName, 
-          asset_image: finalImageUrl,
-          status: '미점검' // 초기 상태
-        }]);
+      // 2단계의 handleSubmit 함수 내부를 이렇게 바꿔보세요
+const { error: dbError } = await supabase
+  .from('assets')
+  .insert([{ 
+    barcode: barcode, 
+    model_name: modelName, 
+    asset_image: finalImageUrl,
+    status: '미점검'
+    // 만약 DB 테이블에 'category'나 다른 필수 컬럼이 있다면 여기에 추가하세요
+  }]);
 
       if (dbError) throw dbError;
 
