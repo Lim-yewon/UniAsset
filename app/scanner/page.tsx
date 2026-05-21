@@ -2,108 +2,58 @@
 
 import React, { useState } from 'react';
 import { useZxing } from 'react-zxing';
-// 🌟 우리가 만들어둔 Supabase 연결 다리 불러오기
 import { supabase } from '../../lib/supabase';
 
 export default function ScannerPage() {
   const [scannedData, setScannedData] = useState('');
-  const [manualInput, setManualInput] = useState('');
-  const [statusMessage, setStatusMessage] = useState('바코드를 스캔하거나 입력해주세요.');
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState({ msg: '바코드를 인식시켜주세요', color: 'text-gray-500' });
+  const [manual, setManual] = useState('');
 
-  // 🌟 핵심 로직: DB에 점검 완료 기록하기
-  const processAssetCheck = async (barcodeString: string) => {
-    if (!barcodeString) return;
-    
-    setIsLoading(true);
-    setStatusMessage('데이터베이스 확인 중... ⏳');
+  const handleUpdate = async (code: string) => {
+    if (!code) return;
+    setStatus({ msg: '데이터 전송 중...', color: 'text-blue-500' });
 
-    try {
-      // 1. Supabase의 'assets' 테이블에서 해당 바코드를 가진 장비를 찾습니다.
-      // 2. 그 장비의 'status'를 '점검완료'로 업데이트합니다.
-      // 🚨 주의: 테이블명(assets)과 컬럼명(barcode, status)은 실제 설정하신 이름과 같아야 합니다!
-      const { data, error } = await supabase
-        .from('assets') 
-        .update({ status: '점검완료' }) 
-        .eq('barcode', barcodeString) 
-        .select();
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ status: '점검완료' })
+      .eq('barcode', code)
+      .select();
 
-      if (error) {
-        console.error('DB 에러:', error);
-        setStatusMessage('❌ DB 업데이트 중 오류가 발생했습니다.');
-        return;
-      }
-
-      // 결과 확인
-      if (data && data.length > 0) {
-        setStatusMessage(`✅ [${barcodeString}] 점검 완료 처리되었습니다!`);
-      } else {
-        setStatusMessage(`⚠️ 등록되지 않은 바코드입니다: ${barcodeString}`);
-      }
-    } catch (err) {
-      setStatusMessage('❌ 네트워크 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
+    if (data && data.length > 0) {
+      setStatus({ msg: `✅ ${code} 점검 완료!`, color: 'text-green-600' });
+    } else {
+      setStatus({ msg: `⚠️ 등록되지 않은 바코드: ${code}`, color: 'text-red-500' });
     }
   };
 
-  // ZXing 바코드 스캐너 엔진 연동
   const { ref } = useZxing({
     onResult(result: any) {
       const code = result.getText();
-      // 똑같은 바코드가 연속으로 여러 번 찍히는 것 방지
-      if (code !== scannedData && !isLoading) { 
+      if (code !== scannedData) {
         setScannedData(code);
-        processAssetCheck(code); // 스캔 즉시 DB 전송 함수 실행!
+        handleUpdate(code);
       }
     },
   });
 
-  // 수기 입력 처리용 함수
-  const handleManualSubmit = () => {
-    setScannedData(manualInput);
-    processAssetCheck(manualInput);
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-      <h1 className="text-2xl font-bold mb-4 text-blue-700">재물조사 스캐너</h1>
+    <div className="max-w-md mx-auto space-y-6">
+      <h1 className="text-2xl font-bold text-gray-800">현장 스캐너</h1>
       
-      {/* 카메라 스캔 영역 */}
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl shadow-lg border-4 border-white relative mb-4">
-        <video ref={ref} className="w-full h-64 object-cover" />
-        <div className="absolute inset-0 border-2 border-red-500 opacity-50 m-8 rounded pointer-events-none z-10"></div>
+      <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white bg-black aspect-square">
+        <video ref={ref} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 border-2 border-blue-400 opacity-30 m-12 rounded-xl pointer-events-none"></div>
       </div>
 
-      {/* DB 처리 상태 알림창 (가장 중요) */}
-      <div className={`p-4 rounded-lg w-full max-w-sm text-center mb-6 font-bold shadow-md transition-colors ${
-        statusMessage.includes('✅') ? 'bg-green-100 text-green-700 border-green-300' : 
-        statusMessage.includes('⚠️') ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
-        statusMessage.includes('❌') ? 'bg-red-100 text-red-700 border-red-300' :
-        'bg-white text-gray-700 border-gray-200'
-      } border-2`}>
-        {statusMessage}
+      <div className={`p-6 bg-white rounded-2xl shadow-md text-center border-t-4 border-blue-500`}>
+        <p className={`text-xl font-bold ${status.color}`}>{status.msg}</p>
       </div>
 
-      {/* 비상용 수기 입력 영역 */}
-      <div className="w-full max-w-sm p-4 bg-gray-200 rounded-lg shadow-inner">
-        <p className="text-sm text-gray-600 mb-2 font-semibold">바코드 인식이 안 되나요?</p>
+      <div className="bg-gray-200 p-4 rounded-xl space-y-2">
+        <p className="text-xs font-bold text-gray-500">인식이 안되나요? 수동 입력</p>
         <div className="flex gap-2">
-          <input 
-            type="text" 
-            value={manualInput}
-            onChange={(e) => setManualInput(e.target.value)}
-            placeholder="바코드 직접 입력" 
-            className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={isLoading}
-          />
-          <button 
-            onClick={handleManualSubmit}
-            disabled={isLoading}
-            className="px-4 py-2 bg-gray-700 text-white font-bold rounded-md hover:bg-gray-800 disabled:bg-gray-400"
-          >
-            입력
-          </button>
+          <input value={manual} onChange={e=>setManual(e.target.value)} className="flex-1 p-2 rounded-lg border-none focus:ring-2 focus:ring-blue-500" placeholder="바코드 번호" />
+          <button onClick={()=>handleUpdate(manual)} className="bg-gray-700 text-white px-4 py-2 rounded-lg font-bold">확인</button>
         </div>
       </div>
     </div>

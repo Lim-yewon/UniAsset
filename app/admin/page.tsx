@@ -1,70 +1,52 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase'; 
+import { supabase } from '../../lib/supabase';
 
-export default function AdminDashboard() {
+export default function AdminPage() {
   const [assets, setAssets] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAssets = async () => {
-      // 🚨 id 대신 예원님의 DB에 맞게 asset_id로 정렬합니다!
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*')
-        .order('asset_id', { ascending: true }); 
-
-      if (error) {
-        console.error('데이터를 불러오지 못했습니다:', error);
-      } else if (data) {
-        setAssets(data);
-      }
-      setIsLoading(false);
+    const getData = async () => {
+      const { data } = await supabase.from('assets').select('*').order('asset_id');
+      if (data) setAssets(data);
     };
-
-    fetchAssets();
+    getData();
   }, []);
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold text-blue-800 mb-8">🖥️ UniAsset 관리자 대시보드</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">자산 관리 대장</h1>
+        <button onClick={()=>window.location.reload()} className="text-sm bg-white border px-4 py-2 rounded-lg shadow-sm">새로고침 🔄</button>
+      </div>
 
-      {isLoading ? (
-        <p>데이터를 불러오는 중입니다...</p>
-      ) : (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <table className="min-w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-blue-100 text-blue-800">
-                <th className="py-3 px-6 font-bold border-b">자산 ID</th>
-                <th className="py-3 px-6 font-bold border-b">바코드 번호</th>
-                <th className="py-3 px-6 font-bold border-b">기자재 분류</th>
-                <th className="py-3 px-6 font-bold border-b">모델명</th>
-                <th className="py-3 px-6 font-bold border-b">점검 상태</th>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="p-4 font-semibold text-gray-600">ID</th>
+              <th className="p-4 font-semibold text-gray-600">바코드</th>
+              <th className="p-4 font-semibold text-gray-600">모델명</th>
+              <th className="p-4 font-semibold text-gray-600">상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assets.map(asset => (
+              <tr key={asset.asset_id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                <td className="p-4 text-gray-500">{asset.asset_id}</td>
+                <td className="p-4 font-mono font-bold text-blue-600">{asset.barcode}</td>
+                <td className="p-4 text-gray-800">{asset.model_name}</td>
+                <td className="p-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${asset.status === '점검완료' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {asset.status || '미점검'}
+                  </span>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {assets.map((asset) => (
-                // 🚨 여기서도 key를 asset_id로 맞춰줍니다.
-                <tr key={asset.asset_id} className="hover:bg-gray-50 border-b">
-                  <td className="py-3 px-6 font-mono text-sm">{asset.asset_id}</td>
-                  <td className="py-3 px-6 font-mono text-sm text-blue-600">{asset.barcode}</td>
-                  <td className="py-3 px-6">{asset.category || '-'}</td>
-                  <td className="py-3 px-6">{asset.model_name || '미등록'}</td>
-                  <td className="py-3 px-6">
-                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                      asset.status === '점검완료' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {asset.status || '미점검'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
