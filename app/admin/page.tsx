@@ -18,30 +18,40 @@ export default function AdminPage() {
   const [editTarget, setEditTarget] = useState<any>(null);
   const [editForm, setEditForm] = useState({ room_id: '', status: '' });
 
-  // 1. 데이터 불러오기 (초기 로딩 및 업데이트 후 재호출용)
+  // 1. 데이터 불러오기 (에러 추적용 로그 추가 및 테이블명 소문자 교체)
   const fetchData = async () => {
-    // 자산 정보 + 위치 정보 + 대여 현황(Rentals) 모두 조인
-    const { data: assetData } = await supabase
+    const { data: assetData, error: assetError } = await supabase
       .from('assets')
       .select(`
         *,
         room:room_id (
           room_id,
           room_number, 
-          location:location_id (location_name)
+          locations:location_id (location_name)
         ),
-        Rentals (
+        rentals (
           status
         )
       `)
       .order('asset_id');
-    if (assetData) setAssets(assetData);
+    
+    if (assetError) {
+      console.error("❌ 기자재 데이터 로드 실패 (F12 콘솔 확인):", assetError);
+    }
+    if (assetData) {
+      setAssets(assetData);
+    }
 
-    // 모달에서 사용할 전체 호실 목록 불러오기
-    const { data: roomData } = await supabase
+    const { data: roomData, error: roomError } = await supabase
       .from('room')
       .select('room_id, room_number, locations:location_id(location_name)');
-    if (roomData) setAllRooms(roomData);
+    
+    if (roomError) {
+      console.error("❌ 호실 데이터 로드 실패 (F12 콘솔 확인):", roomError);
+    }
+    if (roomData) {
+      setAllRooms(roomData);
+    }
   };
 
   useEffect(() => {
@@ -56,7 +66,7 @@ export default function AdminPage() {
     if (error) alert('삭제 실패: ' + error.message);
     else {
       alert('삭제되었습니다.');
-      fetchData(); // 화면 새로고침
+      fetchData();
     }
   };
 
@@ -94,13 +104,13 @@ export default function AdminPage() {
   }, [assets]);
 
   const locations = useMemo(() => {
-    const locs = assets.filter(a => !a.is_rentable).map(a => a.room?.location?.location_name || '미지정');
+    const locs = assets.filter(a => !a.is_rentable).map(a => a.room?.locations?.location_name || '미지정');
     return ['전체', ...Array.from(new Set(locs))];
   }, [assets]);
 
   const rooms = useMemo(() => {
     const filtered = assets.filter(a => 
-      !a.is_rentable && (selectedLocation === '전체' || (a.room?.location?.location_name || '미지정') === selectedLocation)
+      !a.is_rentable && (selectedLocation === '전체' || (a.room?.locations?.location_name || '미지정') === selectedLocation)
     );
     return ['전체', ...Array.from(new Set(filtered.map(a => a.room?.room_number || '미지정')))];
   }, [assets, selectedLocation]);
@@ -116,11 +126,11 @@ export default function AdminPage() {
 
   const groupedFixedAssets = assets
     .filter(a => !a.is_rentable && 
-      (selectedLocation === '전체' || (a.room?.location?.location_name || '미지정') === selectedLocation) &&
+      (selectedLocation === '전체' || (a.room?.locations?.location_name || '미지정') === selectedLocation) &&
       (selectedRoom === '전체' || (a.room?.room_number || '미지정') === selectedRoom)
     )
     .reduce((acc, asset) => {
-      const locName = asset.room?.location?.location_name || '미지정';
+      const locName = asset.room?.locations?.location_name || '미지정';
       const roomNum = asset.room?.room_number || '미지정';
       if (!acc[locName]) acc[locName] = {};
       if (!acc[locName][roomNum]) acc[locName][roomNum] = [];
@@ -128,7 +138,6 @@ export default function AdminPage() {
       return acc;
     }, {});
 
-  // 기자재가 현재 대여 중인지 확인하는 헬퍼 함수
   const isRented = (rentals: any[]) => {
     if (!rentals || rentals.length === 0) return false;
     return rentals.some((r: any) => r.status === '대여중');
@@ -200,7 +209,6 @@ export default function AdminPage() {
                             </span>
                           </div>
                           
-                          {/* 🌟 수정/이동 및 삭제 버튼 */}
                           <div className="flex gap-2">
                             <button onClick={() => openEditModal(item)} className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs font-bold hover:bg-blue-100 transition">이동/수정</button>
                             <button onClick={() => handleDelete(item.asset_id)} className="px-3 py-1 bg-red-50 text-red-600 rounded text-xs font-bold hover:bg-red-100 transition">삭제</button>
@@ -223,7 +231,6 @@ export default function AdminPage() {
                 <th className="p-4 text-sm text-gray-600">위치/학과</th>
                 <th className="p-4 text-sm text-gray-600">모델명</th>
                 <th className="p-4 text-sm text-gray-600">상태</th>
-                {/* 🌟 대여용 탭일 때만 보이는 대여 현황 열 */}
                 {filter === '대여용' && <th className="p-4 text-sm text-gray-600">대여 현황</th>}
               </tr>
             </thead>
@@ -236,15 +243,14 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td className="p-4 text-sm text-gray-600">
-                    {asset.is_rentable ? (asset.department || '미지정') : (asset.room ? `${asset.room.location?.location_name || ''} ${asset.room.room_number || ''}` : '미지정')}
+                    {asset.is_rentable ? (asset.department || '미지정') : (asset.room ? `${asset.room.locations?.location_name || ''} ${asset.room.room_number || ''}` : '미지정')}
                   </td>
                   <td className="p-4 font-medium text-gray-800">{asset.model_name}</td>
                   <td className="p-4 text-sm text-gray-600">{asset.status}</td>
                   
-                  {/* 🌟 대여 현황 뱃지 */}
                   {filter === '대여용' && (
                     <td className="p-4">
-                      {isRented(asset.Rentals) ? (
+                      {isRented(asset.rentals) ? (
                         <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">대여중</span>
                       ) : (
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">대여가능</span>
@@ -258,7 +264,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* 🌟 고정 자산 이동/수정 모달창 */}
+      {/* 고정 자산 이동/수정 모달창 */}
       {isModalOpen && editTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md">
