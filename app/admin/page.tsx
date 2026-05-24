@@ -226,14 +226,18 @@ export default function AdminPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="p-4 text-sm text-gray-600">유형</th>
-                <th className="p-4 text-sm text-gray-600">위치/학과</th>
-                <th className="p-4 text-sm text-gray-600">모델명</th>
-                <th className="p-4 text-sm text-gray-600">상태</th>
-                {filter === '대여용' && <th className="p-4 text-sm text-gray-600">대여 현황</th>}
-              </tr>
-            </thead>
+  <tr>
+    <th className="p-4 text-sm text-gray-600">유형</th>
+    {/* 🌟 탭에 따라 컬럼명 동적 변경 */}
+    <th className="p-4 text-sm text-gray-600">
+      {filter === '대여용' ? '학과' : filter === '고정' ? '위치' : '위치/학과'}
+    </th>
+    <th className="p-4 text-sm text-gray-600">모델명</th>
+    <th className="p-4 text-sm text-gray-600">상태</th>
+    {filter === '대여용' && <th className="p-4 text-sm text-gray-600">대여 현황</th>}
+  </tr>
+</thead>
+    
             <tbody>
               {(filter === '대여용' ? rentalAssets : allAssets).map(asset => (
                 <tr key={asset.asset_id} className="border-b hover:bg-gray-50">
