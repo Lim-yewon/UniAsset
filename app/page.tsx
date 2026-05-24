@@ -68,7 +68,7 @@ export default function HomePage() {
     }, {} as Record<string, number>);
 
     // 고장 많은 순으로 정렬
-    const sortedRooms = Object.entries(roomBreakdown).sort((a, b) => b[1] - a[1]);
+    const sortedRooms = (Object.entries(roomBreakdown) as [string, number][]).sort((a, b) => b[1] - a[1]);
 
     return { total, faultyCount, faultyPercent, sortedRooms };
   }, [assets, selectedDept]);
