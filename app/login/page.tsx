@@ -16,7 +16,7 @@ export default function LoginPage() {
   setLoading(true);
   setErrorMsg('');
 
-  // 1. Supabase Auth 로그인
+  // 1. Supabase Auth 인증
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -31,54 +31,39 @@ export default function LoginPage() {
   const userId = authData.user.id;
 
   try {
-    // 2. 구조에 맞춘 권한 식별 로직 (존재 여부만 확인)
-    
-    // [교직원 확인] - Staff 테이블에 해당 user_uuid를 가진 행이 있는지 확인
-    const { data: staffData } = await supabase
-      .from('Staff')
-      .select('staff_id')
-      .eq('user_uuid', userId)
-      .maybeSingle(); // single() 대신 maybeSingle()을 쓰면 데이터가 없을 때 에러를 뿜지 않고 null을 반환합니다.
-
-    if (staffData) {
-      router.push('/admin'); // 교직원 관리자 페이지로 이동
-      return;
-    }
-
-    // [교수 확인] - Professor 테이블에 해당 user_uuid가 있는지 확인
-    const { data: profData } = await supabase
-      .from('Professor')
-      .select('prof_id')
+    // 2. 통합 User 테이블에서 내 권한(role) 단번 조회
+    const { data: userData } = await supabase
+      .from('User') // 🌟 대문자 주의
+      .select('user_id, role')
       .eq('user_uuid', userId)
       .maybeSingle();
 
-    if (profData) {
-      router.push('/admin'); // 교수도 관리자 페이지로 이동
+    if (!userData) {
+      setErrorMsg('등록된 통합 사용자 정보가 없습니다. 관리자에게 문의하세요.');
+      await supabase.auth.signOut();
       return;
     }
 
-    // [학생 확인] - student 테이블 확인
-    const { data: studentData } = await supabase
-      .from('student')
-      .select('is_work_study')
-      .eq('user_uuid', userId)
-      .maybeSingle();
+    // 3. 역할에 따른 화면 분기
+    if (userData.role === 'STAFF' || userData.role === 'PROFESSOR') {
+      router.push('/admin'); // 교직원 및 교수는 관리자 대시보드로 직행
+      
+    } else if (userData.role === 'STUDENT') {
+      // 학생인 경우, 자식 테이블(student)에서 근로여부 추가 확인
+      const { data: studentData } = await supabase
+        .from('student') // 🌟 소문자
+        .select('is_work_study')
+        .eq('user_id', userData.user_id)
+        .maybeSingle();
 
-    if (studentData) {
-      if (studentData.is_work_study) {
-        router.push('/admin'); // 근로학생은 관리자 페이지 접근
+      if (studentData?.is_work_study) {
+        router.push('/admin'); // 근로학생은 관리자 뷰 접근
       } else {
-        router.push('/student'); // 일반학생 페이지 이동
+        router.push('/student'); // 일반 학생은 대여 전용 뷰
       }
-      return;
     }
-
-    // 어떤 테이블에도 유저 정보가 매핑되어 있지 않은 경우
-    setErrorMsg('등록된 사용자 정보가 없습니다. 학과 사무실에 문의하세요.');
-    await supabase.auth.signOut();
-
   } catch (err) {
-    setErrorMsg('권한을 확인하는 중 시스템 오류가 발생했습니다.');
+    setErrorMsg('권한 확인 중 오류가 발생했습니다.');
   } finally {
     setLoading(false);
   }
