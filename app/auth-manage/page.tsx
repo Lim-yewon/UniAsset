@@ -15,7 +15,7 @@ export default function AuthManagePage() {
       setLoading(true);
 
       const { data: studentData, error } = await supabase.from('student').select(`
-        student_id,
+        user_id,
         is_work_study,
         User (
           name,
@@ -117,7 +117,7 @@ export default function AuthManagePage() {
           <div className="divide-y divide-slate-100">
             {students.map((s) => (
               <div
-                key={s.student_id}
+                key={s.user_id}
                 className="flex flex-col md:flex-row items-start md:items-center justify-between px-6 py-4 gap-4 hover:bg-slate-50 transition-colors"
               >
                 {/* Student Info */}
@@ -136,7 +136,7 @@ export default function AuthManagePage() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-slate-400 font-mono">{s.student_id}</span>
+                    <span className="text-xs text-slate-400 font-mono">{s.user_id}</span>
                   </div>
                 </div>
 
@@ -147,7 +147,7 @@ export default function AuthManagePage() {
                     defaultValue=""
                     onChange={(e) => {
                       const val = parseInt(e.target.value);
-                      if (val) handleAssign(s.student_id, val);
+                      if (val) handleAssign(s.user_id, val);
                     }}
                   >
                     <option value="" disabled>
@@ -161,9 +161,9 @@ export default function AuthManagePage() {
                   </select>
 
                   <div className="w-16 text-xs font-bold text-center shrink-0">
-                    {assigning === s.student_id ? (
+                    {assigning === s.user_id ? (
                       <span className="text-slate-400">처리중...</span>
-                    ) : successMap[s.student_id] ? (
+                    ) : successMap[s.user_id] ? (
                       <span className="text-emerald-600">✅ 완료</span>
                     ) : null}
                   </div>
