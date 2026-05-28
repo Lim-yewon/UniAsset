@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../lib/AuthContext';
 
 const STATUS_OPTIONS = ['접수대기', '수리중', '수리완료'] as const;
 type FaultStatus = (typeof STATUS_OPTIONS)[number];
@@ -13,22 +14,66 @@ const STATUS_STYLE: Record<FaultStatus, string> = {
 };
 
 export default function AdminFaultsPage() {
+  const { user, loading: authLoading } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
+  const [deptLabel, setDeptLabel] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchReports = async () => {
-      setLoading(true);
-      const { data } = await supabase
-        .from('fault_reports')
-        .select('*')
-        .order('reported_at', { ascending: false });
-      if (data) setReports(data);
-      setLoading(false);
-    };
+    if (authLoading || !user) return;
     fetchReports();
-  }, []);
+  }, [authLoading, user]);
+
+  const fetchReports = async () => {
+    setLoading(true);
+
+    // 교수는 자신이 담당하는 major의 자산 고장신고만 조회
+    if (user!.role === 'PROFESSOR') {
+      const { data: majorData } = await supabase
+        .from('major')
+        .select('major_id, major_name')
+        .eq('manager_uuid', user!.authUuid)
+        .maybeSingle();
+
+      if (majorData) {
+        setDeptLabel(majorData.major_name);
+
+        const { data: assetData } = await supabase
+          .from('assets')
+          .select('barcode')
+          .eq('owning_major_id', majorData.major_id);
+
+        const barcodes = assetData?.map((a) => a.barcode) ?? [];
+
+        if (barcodes.length === 0) {
+          setReports([]);
+          setLoading(false);
+          return;
+        }
+
+        const { data } = await supabase
+          .from('fault_reports')
+          .select('*')
+          .in('barcode', barcodes)
+          .order('reported_at', { ascending: false });
+
+        setReports(data ?? []);
+        setLoading(false);
+        return;
+      }
+      // major 없는 교수는 전체 표시 (예외 처리)
+    }
+
+    // STAFF 또는 major 미지정 PROFESSOR: 전체 조회
+    setDeptLabel(null);
+    const { data } = await supabase
+      .from('fault_reports')
+      .select('*')
+      .order('reported_at', { ascending: false });
+    setReports(data ?? []);
+    setLoading(false);
+  };
 
   const handleStatusChange = (id: number, value: string) => {
     setReports(reports.map((r) => (r.id === id ? { ...r, status: value } : r)));
@@ -45,7 +90,7 @@ export default function AdminFaultsPage() {
     if (error) alert('❌ 저장 실패: ' + error.message);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
@@ -62,7 +107,9 @@ export default function AdminFaultsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">고장 신고 관리</h1>
           <p className="text-slate-500 text-sm mt-1">
-            접수된 고장 신고를 확인하고 처리 상태를 업데이트하세요.
+            {deptLabel
+              ? `${deptLabel} 학과 기자재 고장 신고를 확인하고 처리합니다.`
+              : '접수된 고장 신고를 확인하고 처리 상태를 업데이트하세요.'}
           </p>
         </div>
         <div className="shrink-0 px-3 py-1.5 bg-slate-100 rounded-lg">

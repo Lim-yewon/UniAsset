@@ -2,44 +2,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '../../lib/AuthContext';
 
 export default function RentalsPage() {
-  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'available' | 'my_rentals'>('available');
-  const [currentUserInfo, setCurrentUserInfo] = useState<any>(null);
   const [availableAssets, setAvailableAssets] = useState<any[]>([]);
   const [myRentals, setMyRentals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoading(true);
-
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
-        router.push('/login');
-        return;
-      }
-
-      const { data: userData } = await supabase
-        .from('User')
-        .select('user_id, name, role')
-        .eq('user_uuid', authData.user.id)
-        .single();
-
-      if (userData) {
-        setCurrentUserInfo(userData);
-        fetchAssets();
-        fetchMyRentals(userData.user_id);
-      }
-
-      setLoading(false);
-    };
-
-    fetchInitialData();
-  }, []);
+    if (authLoading || !user) return;
+    Promise.all([fetchAssets(), fetchMyRentals()]).finally(() => setLoading(false));
+  }, [authLoading, user]);
 
   const fetchAssets = async () => {
     const { data } = await supabase
@@ -60,22 +36,23 @@ export default function RentalsPage() {
     }
   };
 
-  const fetchMyRentals = async (userId: string) => {
+  const fetchMyRentals = async () => {
+    if (!user) return;
     const { data } = await supabase
       .from('rentals')
       .select('rental_id, status, rental_date, return_date, assets(asset_id, model_name, department)')
-      .eq('user_id', userId)
+      .eq('user_id', user.userId)
       .order('rental_date', { ascending: false });
     if (data) setMyRentals(data);
   };
 
   const handleRentRequest = async (assetId: string) => {
-    if (!window.confirm('이 기자재를 대여 신청하시겠습니까?')) return;
+    if (!user || !window.confirm('이 기자재를 대여 신청하시겠습니까?')) return;
     setActionLoading(assetId);
 
     const { error } = await supabase.from('rentals').insert({
       asset_id: assetId,
-      user_id: currentUserInfo.user_id,
+      user_id: user.userId,
       status: '대여신청',
       rental_date: new Date().toISOString(),
     });
@@ -103,13 +80,8 @@ export default function RentalsPage() {
     if (error) {
       alert('반납 처리 중 오류가 발생했습니다.');
     } else {
-      fetchMyRentals(currentUserInfo.user_id);
+      fetchMyRentals();
     }
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
   };
 
   const rentalStatusStyle: Record<string, string> = {
@@ -119,7 +91,7 @@ export default function RentalsPage() {
     반납완료: 'bg-slate-100 text-slate-600',
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
@@ -133,21 +105,13 @@ export default function RentalsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Profile Header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">기자재 대여 / 반납</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            반갑습니다,{' '}
-            <span className="font-bold text-sky-600">{currentUserInfo?.name}</span>님.
-            대여 가능한 기자재 목록을 확인하세요.
-          </p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="shrink-0 px-4 py-2 bg-slate-100 text-slate-600 text-sm rounded-xl font-semibold hover:bg-slate-200 transition"
-        >
-          로그아웃
-        </button>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+        <h1 className="text-xl font-bold text-slate-800">기자재 대여 / 반납</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          반갑습니다,{' '}
+          <span className="font-bold text-sky-600">{user?.name}</span>님.
+          대여 가능한 기자재 목록을 확인하세요.
+        </p>
       </div>
 
       {/* Tab Switcher */}
@@ -202,9 +166,11 @@ export default function RentalsPage() {
                 className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center hover:border-sky-300 transition-colors gap-4"
               >
                 <div className="min-w-0">
-                  <span className="text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md">
-                    {asset.department}
-                  </span>
+                  {asset.department && (
+                    <span className="text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md">
+                      {asset.department}
+                    </span>
+                  )}
                   <h3 className="font-bold text-slate-800 mt-2 text-base truncate">
                     {asset.model_name}
                   </h3>
@@ -255,7 +221,7 @@ export default function RentalsPage() {
                   </div>
                   <h3 className="font-bold text-slate-800">{rental.assets?.model_name}</h3>
                   <p className="text-sm text-slate-500 mt-0.5">
-                    관리 부서: {rental.assets?.department}
+                    관리 부서: {rental.assets?.department ?? '미지정'}
                   </p>
                 </div>
 

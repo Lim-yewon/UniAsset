@@ -49,7 +49,7 @@ export default function LoginPage() {
           .eq('user_id', userData.user_id)
           .maybeSingle();
 
-        router.push(studentData?.is_work_study ? '/admin' : '/rentals');
+        router.push('/rentals');
       }
     } catch {
       setErrorMsg('권한 확인 중 오류가 발생했습니다.');

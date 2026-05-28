@@ -21,7 +21,7 @@ export default function AuthManagePage() {
           name,
           role
         )
-      `);
+      `).eq('is_work_study', true);
 
       if (error) console.error('학생 조회 에러:', error);
       setStudents(studentData || []);
