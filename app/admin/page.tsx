@@ -233,53 +233,59 @@ export default function AdminPage() {
               해당 조건의 고정 자산이 없습니다.
             </div>
           ) : (
-            Object.entries(groupedFixedAssets).map(([locName, roomsData]) => (
-              <div key={locName} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 className="text-base font-bold text-sky-600 mb-4 border-b border-slate-100 pb-3">
-                  {locName}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(roomsData).map(([roomNum, items]: [string, any]) => (
-                    <div key={roomNum} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                      <h3 className="font-bold text-slate-600 text-sm mb-3">{roomNum}</h3>
-                      <ul className="space-y-2">
-                        {items.map((item: any) => (
-                          <li
-                            key={item.asset_id}
-                            className="text-sm flex justify-between items-center bg-white p-3 rounded-lg shadow-sm border border-slate-100"
-                          >
-                            <div>
-                              <p className="font-semibold text-slate-800">{item.model_name}</p>
-                              <span
-                                className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  STATUS_STYLE[item.status] ?? 'bg-slate-100 text-slate-600'
-                                }`}
+            Object.keys(groupedFixedAssets).map((locName) => {
+              const roomsData = groupedFixedAssets[locName];
+              return (
+                <div key={locName} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                  <h2 className="text-base font-bold text-sky-600 mb-4 border-b border-slate-100 pb-3">
+                    {locName}
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.keys(roomsData).map((roomNum) => {
+                      const items = roomsData[roomNum];
+                      return (
+                        <div key={roomNum} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          <h3 className="font-bold text-slate-600 text-sm mb-3">{roomNum}</h3>
+                          <ul className="space-y-2">
+                            {items.map((item: any) => (
+                              <li
+                                key={item.asset_id}
+                                className="text-sm flex justify-between items-center bg-white p-3 rounded-lg shadow-sm border border-slate-100"
                               >
-                                {item.status}
-                              </span>
-                            </div>
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => openEditModal(item)}
-                                className="px-2.5 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-xs font-bold hover:bg-sky-100 transition"
-                              >
-                                수정
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item.asset_id)}
-                                className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition"
-                              >
-                                삭제
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                                <div>
+                                  <p className="font-semibold text-slate-800">{item.model_name}</p>
+                                  <span
+                                    className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                                      STATUS_STYLE[item.status] ?? 'bg-slate-100 text-slate-600'
+                                    }`}
+                                  >
+                                    {item.status}
+                                  </span>
+                                </div>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    onClick={() => openEditModal(item)}
+                                    className="px-2.5 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-xs font-bold hover:bg-sky-100 transition"
+                                  >
+                                    수정
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(item.asset_id)}
+                                    className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition"
+                                  >
+                                    삭제
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       ) : (
