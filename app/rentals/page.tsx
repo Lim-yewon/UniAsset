@@ -25,24 +25,13 @@ export default function RentalsPage() {
 
       const { data: userData } = await supabase
         .from('User')
-        .select(`
-          user_id,
-          name,
-          role,
-          student (
-            major_id,
-            major (
-              major_name
-            )
-          )
-        `)
+        .select('user_id, name, role')
         .eq('user_uuid', authData.user.id)
         .single();
 
       if (userData) {
         setCurrentUserInfo(userData);
-        const studentDept = (userData.student as any)?.major?.major_name;
-        if (studentDept) fetchAssets(studentDept);
+        fetchAssets();
         fetchMyRentals(userData.user_id);
       }
 
@@ -52,13 +41,12 @@ export default function RentalsPage() {
     fetchInitialData();
   }, []);
 
-  const fetchAssets = async (departmentName: string) => {
+  const fetchAssets = async () => {
     const { data } = await supabase
       .from('assets')
       .select('*, rentals(status)')
       .eq('is_rentable', true)
-      .eq('status', '정상')
-      .eq('department', departmentName);
+      .eq('status', '정상');
 
     if (data) {
       setAvailableAssets(
@@ -97,8 +85,7 @@ export default function RentalsPage() {
     if (error) {
       alert('신청 중 오류가 발생했습니다.');
     } else {
-      const studentDept = (currentUserInfo.student as any)?.major?.major_name;
-      if (studentDept) fetchAssets(studentDept);
+      fetchAssets();
     }
   };
 
@@ -143,8 +130,6 @@ export default function RentalsPage() {
     );
   }
 
-  const studentDept = (currentUserInfo?.student as any)?.major?.major_name;
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Profile Header */}
@@ -153,13 +138,8 @@ export default function RentalsPage() {
           <h1 className="text-xl font-bold text-slate-800">기자재 대여 / 반납</h1>
           <p className="text-sm text-slate-500 mt-1">
             반갑습니다,{' '}
-            <span className="font-bold text-sky-600">{currentUserInfo?.name}</span>님.{' '}
-            {studentDept && (
-              <>
-                <span className="font-semibold text-slate-700">{studentDept}</span> 학과 자산만
-                조회됩니다.
-              </>
-            )}
+            <span className="font-bold text-sky-600">{currentUserInfo?.name}</span>님.
+            대여 가능한 기자재 목록을 확인하세요.
           </p>
         </div>
         <button
@@ -212,9 +192,7 @@ export default function RentalsPage() {
               <p className="text-3xl mb-2">📦</p>
               <p className="font-semibold text-slate-600">대여 가능한 기자재가 없습니다</p>
               <p className="text-sm text-slate-400 mt-1">
-                {studentDept
-                  ? `${studentDept} 학과 기자재가 모두 대여 중이거나 수리 중입니다.`
-                  : '소속 학과 정보가 없습니다.'}
+                현재 대여 가능한 기자재가 없습니다. 잠시 후 다시 확인해 주세요.
               </p>
             </div>
           ) : (
