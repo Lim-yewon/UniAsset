@@ -12,105 +12,119 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setErrorMsg('');
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
 
-  // 1. Supabase Auth 인증
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (authError || !authData.user) {
-    setErrorMsg('로그인 실패: 이메일이나 비밀번호를 확인해주세요.');
-    setLoading(false);
-    return;
-  }
-
-  const userId = authData.user.id;
-
-  try {
-    // 2. 통합 User 테이블에서 내 권한(role) 단번 조회
-    const { data: userData } = await supabase
-      .from('User') // 🌟 대문자 주의
-      .select('user_id, role')
-      .eq('user_uuid', userId)
-      .maybeSingle();
-
-    if (!userData) {
-      setErrorMsg('등록된 통합 사용자 정보가 없습니다. 관리자에게 문의하세요.');
-      await supabase.auth.signOut();
+    if (authError || !authData.user) {
+      setErrorMsg('이메일 또는 비밀번호가 올바르지 않습니다.');
+      setLoading(false);
       return;
     }
 
-    // 3. 역할에 따른 화면 분기
-    if (userData.role === 'STAFF' || userData.role === 'PROFESSOR') {
-      router.push('/admin'); // 교직원 및 교수는 관리자 대시보드로 직행
-      
-    } else if (userData.role === 'STUDENT') {
-      // 학생인 경우, 자식 테이블(student)에서 근로여부 추가 확인
-      const { data: studentData } = await supabase
-        .from('student') // 🌟 소문자
-        .select('is_work_study')
-        .eq('user_id', userData.user_id)
+    try {
+      const { data: userData } = await supabase
+        .from('User')
+        .select('user_id, role')
+        .eq('user_uuid', authData.user.id)
         .maybeSingle();
 
-      if (studentData?.is_work_study) {
-        router.push('/admin'); // 근로학생은 관리자 뷰 접근
-      } else {
-        router.push('/student'); // 일반 학생은 대여 전용 뷰
+      if (!userData) {
+        setErrorMsg('등록된 사용자 정보가 없습니다. 관리자에게 문의하세요.');
+        await supabase.auth.signOut();
+        return;
       }
+
+      if (userData.role === 'STAFF' || userData.role === 'PROFESSOR') {
+        router.push('/admin');
+      } else if (userData.role === 'STUDENT') {
+        const { data: studentData } = await supabase
+          .from('student')
+          .select('is_work_study')
+          .eq('user_id', userData.user_id)
+          .maybeSingle();
+
+        router.push(studentData?.is_work_study ? '/admin' : '/rentals');
+      }
+    } catch {
+      setErrorMsg('권한 확인 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    setErrorMsg('권한 확인 중 오류가 발생했습니다.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="w-full max-w-sm">
+        {/* Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-gray-800">통합 자산관리 시스템</h1>
-          <p className="text-gray-500 mt-2 text-sm">학교 계정으로 로그인해주세요.</p>
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-sky-600 rounded-2xl mb-4 shadow-lg">
+            <span className="text-2xl">🎓</span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-800">
+            Uni<span className="text-sky-500">Asset</span>
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm">학교 계정으로 로그인하세요.</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">이메일</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 transition"
-              placeholder="example@hs.ac.kr"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">비밀번호</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 transition"
-              placeholder="••••••••"
-              required
-            />
-          </div>
+        {/* Login Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">이메일</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition text-sm"
+                placeholder="example@hs.ac.kr"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">비밀번호</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition text-sm"
+                placeholder="••••••••"
+                required
+              />
+            </div>
 
-          {errorMsg && <p className="text-red-500 text-sm font-bold">{errorMsg}</p>}
+            {errorMsg && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
+                <span>⚠️</span>
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition disabled:bg-blue-300 mt-4"
-          >
-            {loading ? '로그인 중...' : '로그인'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm mt-2"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  로그인 중...
+                </span>
+              ) : (
+                '로그인'
+              )}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-xs text-slate-400 mt-6">
+          로그인 문제가 있다면 관리자에게 문의하세요.
+        </p>
       </div>
     </div>
   );
