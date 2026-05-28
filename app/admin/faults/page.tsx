@@ -79,15 +79,24 @@ export default function AdminFaultsPage() {
     setReports(reports.map((r) => (r.id === id ? { ...r, status: value } : r)));
   };
 
+  const ASSET_STATUS_MAP: Record<string, string> = {
+    접수대기: '수리요망',
+    수리중: '수리중',
+    수리완료: '정상',
+  };
+
   const saveStatus = async (id: number) => {
     setSaving(id);
     const report = reports.find((r) => r.id === id);
-    const { error } = await supabase
-      .from('fault_reports')
-      .update({ status: report.status })
-      .eq('id', id);
+    const [{ error }] = await Promise.all([
+      supabase.from('fault_reports').update({ status: report.status }).eq('id', id),
+      supabase
+        .from('assets')
+        .update({ status: ASSET_STATUS_MAP[report.status] ?? '수리요망' })
+        .eq('barcode', report.barcode),
+    ]);
     setSaving(null);
-    if (error) alert('❌ 저장 실패: ' + error.message);
+    if (error) alert('저장 실패: ' + error.message);
   };
 
   if (authLoading || loading) {
