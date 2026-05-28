@@ -148,46 +148,52 @@ export default function AssetsManagementPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {(Object.entries(groupedAbnormal) as [string, Record<string, any[]>][]).map(([loc, rooms]) => (
-              <div key={loc} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                  <h3 className="font-bold text-slate-700 text-sm">{loc}</h3>
-                </div>
-                <div className="p-4 space-y-4">
-                  {Object.entries(rooms).map(([room, items]: [string, any]) => (
-                    <div key={room}>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                        {room}
-                      </p>
-                      <div className="space-y-1.5">
-                        {items.map((item: any) => (
-                          <div
-                            key={item.asset_id}
-                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                          >
-                            <div>
-                              <span className="font-semibold text-slate-700 text-sm">
-                                {item.model_name}
-                              </span>
-                              <span className="ml-2 font-mono text-xs text-slate-400">
-                                {item.barcode}
-                              </span>
-                            </div>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                STATUS_STYLE[item.status] ?? 'bg-slate-100 text-slate-600'
-                              }`}
-                            >
-                              {item.status}
-                            </span>
+            {Object.keys(groupedAbnormal).map((loc) => {
+              const rooms = groupedAbnormal[loc];
+              return (
+                <div key={loc} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-700 text-sm">{loc}</h3>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {Object.keys(rooms).map((room) => {
+                      const items = rooms[room];
+                      return (
+                        <div key={room}>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            {room}
+                          </p>
+                          <div className="space-y-1.5">
+                            {items.map((item: any) => (
+                              <div
+                                key={item.asset_id}
+                                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                              >
+                                <div>
+                                  <span className="font-semibold text-slate-700 text-sm">
+                                    {item.model_name}
+                                  </span>
+                                  <span className="ml-2 font-mono text-xs text-slate-400">
+                                    {item.barcode}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                    STATUS_STYLE[item.status] ?? 'bg-slate-100 text-slate-600'
+                                  }`}
+                                >
+                                  {item.status}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
