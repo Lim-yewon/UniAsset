@@ -148,7 +148,7 @@ export default function AssetsManagementPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {Object.entries(groupedAbnormal).map(([loc, rooms]) => (
+            {Object.entries(groupedAbnormal).map(([loc, rooms]: [string, Record<string, any[]>]) => (
               <div key={loc} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm">{loc}</h3>
