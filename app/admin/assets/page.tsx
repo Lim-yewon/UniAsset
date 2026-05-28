@@ -124,7 +124,7 @@ export default function AssetsManagementPage() {
                 )}
                 {!a.is_rentable && a.room && (
                   <p className="text-xs text-slate-400 mt-2">
-                    📍 {a.room.location?.location_name} {a.room.room_number}
+                    {a.room.location?.location_name} {a.room.room_number}
                   </p>
                 )}
               </div>
@@ -143,8 +143,7 @@ export default function AssetsManagementPage() {
         </div>
         {abnormalAssets.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
-            <p className="text-2xl mb-2">🎉</p>
-            <p className="text-slate-600 font-semibold">비정상 상태의 자산이 없습니다!</p>
+            <p className="text-slate-600 font-semibold">비정상 상태의 자산이 없습니다</p>
             <p className="text-sm text-slate-400 mt-1">모든 기자재가 정상 작동 중입니다.</p>
           </div>
         ) : (
@@ -152,7 +151,7 @@ export default function AssetsManagementPage() {
             {Object.entries(groupedAbnormal).map(([loc, rooms]) => (
               <div key={loc} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                  <h3 className="font-bold text-slate-700 text-sm">📍 {loc}</h3>
+                  <h3 className="font-bold text-slate-700 text-sm">{loc}</h3>
                 </div>
                 <div className="p-4 space-y-4">
                   {Object.entries(rooms).map(([room, items]: [string, any]) => (

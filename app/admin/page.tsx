@@ -236,7 +236,7 @@ export default function AdminPage() {
             Object.entries(groupedFixedAssets).map(([locName, roomsData]) => (
               <div key={locName} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 className="text-base font-bold text-sky-600 mb-4 border-b border-slate-100 pb-3">
-                  📍 {locName}
+                  {locName}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(roomsData).map(([roomNum, items]: [string, any]) => (

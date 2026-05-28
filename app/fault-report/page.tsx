@@ -27,6 +27,11 @@ export default function FaultReportPage() {
       return;
     }
 
+    await supabase
+      .from('assets')
+      .update({ status: '수리요망' })
+      .eq('barcode', barcode);
+
     const { error: insertError } = await supabase.from('fault_reports').insert([
       {
         barcode,
@@ -56,8 +61,8 @@ export default function FaultReportPage() {
     return (
       <div className="max-w-lg mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-12 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-            ✅
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">고장 신고가 접수되었습니다</h2>
           <p className="text-slate-500 text-sm mb-1">
@@ -83,7 +88,6 @@ export default function FaultReportPage() {
       {/* Header Banner */}
       <div className="bg-red-600 text-white p-6 rounded-2xl">
         <div className="flex items-center gap-3 mb-2">
-          <span className="text-2xl">🚨</span>
           <h1 className="text-xl font-bold">기자재 고장 신고</h1>
         </div>
         <p className="text-red-100 text-sm leading-relaxed">
@@ -152,7 +156,7 @@ export default function FaultReportPage() {
 
       {/* Info Box */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p className="text-xs font-bold text-amber-700 mb-2">📌 알아두세요</p>
+        <p className="text-xs font-bold text-amber-700 mb-2">알아두세요</p>
         <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
           <li>신고 접수 후 담당 관리자가 기자재 상태를 확인합니다.</li>
           <li>처리 현황은 관리자에게 직접 문의하세요.</li>

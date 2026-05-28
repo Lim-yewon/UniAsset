@@ -8,14 +8,14 @@ import { AuthProvider, useAuth } from '../lib/AuthContext';
 
 function NavLink({
   href,
-  emoji,
   label,
   color = 'text-slate-300',
+  emoji,
 }: {
   href: string;
-  emoji: string;
   label: string;
   color?: string;
+  emoji?: string;
 }) {
   const pathname = usePathname();
   const active = pathname === href;
@@ -28,7 +28,11 @@ function NavLink({
           : `${color} font-medium hover:bg-slate-700/50 hover:text-white`
       }`}
     >
-      <span className="w-5 text-center">{emoji}</span>
+      {emoji ? (
+        <span className="w-5 text-center shrink-0">{emoji}</span>
+      ) : (
+        <span className="w-1 shrink-0" />
+      )}
       <span className="flex-1">{label}</span>
       {active && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />}
     </Link>
@@ -88,12 +92,12 @@ function Sidebar() {
           서비스
         </p>
 
-        {isAdmin && <NavLink href="/" emoji="🏠" label="홈 대시보드" />}
+        {isAdmin && <NavLink href="/" label="홈 대시보드" />}
 
         {!isAdmin && (
           <>
-            <NavLink href="/rentals" emoji="📦" label="기자재 대여/반납" />
-            <NavLink href="/fault-report" emoji="🚨" label="고장 신고" color="text-red-400" />
+            <NavLink href="/rentals" label="기자재 대여/반납" />
+            <NavLink href="/fault-report" label="고장 신고" color="text-red-400" />
           </>
         )}
 
@@ -104,7 +108,7 @@ function Sidebar() {
                 근로 공간
               </p>
             </div>
-            <NavLink href="/scanner" emoji="📷" label="재물조사 스캐너" color="text-emerald-400" />
+            <NavLink href="/scanner" label="재물조사 스캐너" color="text-emerald-400" />
           </>
         )}
 
@@ -116,9 +120,9 @@ function Sidebar() {
               </p>
             </div>
             <NavLink href="/register" emoji="➕" label="신규 기자재 등록" color="text-sky-400" />
-            <NavLink href="/admin" emoji="📊" label="자산 관리 대장" color="text-violet-400" />
-            <NavLink href="/admin/faults" emoji="🛠️" label="고장 신고 관리" color="text-red-400" />
-            <NavLink href="/auth-manage" emoji="🔑" label="권한 및 근로 배정" color="text-amber-400" />
+            <NavLink href="/admin" label="자산 관리 대장" color="text-violet-400" />
+            <NavLink href="/admin/faults" label="고장 신고 관리" color="text-red-400" />
+            <NavLink href="/auth-manage" label="권한 및 근로 배정" color="text-amber-400" />
           </>
         )}
       </div>

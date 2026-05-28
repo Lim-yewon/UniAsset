@@ -107,8 +107,8 @@ export default function RegisterAssetPage() {
     return (
       <div className="max-w-xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-12 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-            ✅
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">등록이 완료되었습니다</h2>
           <p className="text-slate-500 text-sm mb-1">
@@ -191,7 +191,7 @@ export default function RegisterAssetPage() {
                 }`}
               >
                 <p className={`text-sm font-bold ${isRentable ? 'text-sky-700' : 'text-slate-600'}`}>
-                  📦 대여용
+                  대여용
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">학생에게 대여 가능</p>
               </button>
@@ -207,7 +207,7 @@ export default function RegisterAssetPage() {
                 <p
                   className={`text-sm font-bold ${!isRentable ? 'text-violet-700' : 'text-slate-600'}`}
                 >
-                  🔒 고정 자산
+                  고정 자산
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">특정 강의실 배치</p>
               </button>
@@ -273,7 +273,6 @@ export default function RegisterAssetPage() {
                 </div>
               ) : (
                 <label className="cursor-pointer block py-10 text-center hover:bg-slate-50 transition">
-                  <span className="text-3xl">📷</span>
                   <p className="text-sm text-slate-500 mt-2 font-medium">클릭하여 사진 첨부</p>
                   <p className="text-xs text-slate-400 mt-0.5">JPG, PNG, HEIC 지원</p>
                   <input

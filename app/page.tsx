@@ -186,7 +186,7 @@ export default function HomePage() {
             href="/scanner"
             className="bg-white text-sky-600 px-6 py-3 rounded-xl font-bold hover:bg-sky-50 transition whitespace-nowrap shadow-md text-sm"
           >
-            스캐너 열기 📷
+            스캐너 열기
           </Link>
         </div>
       </div>

@@ -64,7 +64,7 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-sky-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-2xl">🎓</span>
+            <span className="text-xl font-black text-white">UA</span>
           </div>
           <h1 className="text-2xl font-black text-slate-800">
             Uni<span className="text-sky-500">Asset</span>

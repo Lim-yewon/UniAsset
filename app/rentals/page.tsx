@@ -153,7 +153,6 @@ export default function RentalsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {availableAssets.length === 0 ? (
             <div className="col-span-full bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
-              <p className="text-3xl mb-2">📦</p>
               <p className="font-semibold text-slate-600">대여 가능한 기자재가 없습니다</p>
               <p className="text-sm text-slate-400 mt-1">
                 현재 대여 가능한 기자재가 없습니다. 잠시 후 다시 확인해 주세요.
@@ -194,7 +193,6 @@ export default function RentalsPage() {
         <div className="space-y-3">
           {myRentals.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
-              <p className="text-3xl mb-2">📋</p>
               <p className="font-semibold text-slate-600">대여 내역이 없습니다</p>
               <p className="text-sm text-slate-400 mt-1">
                 대여 가능 목록에서 기자재를 신청해보세요.

@@ -32,7 +32,7 @@ export default function ScannerPage() {
     const success = !!(data && data.length > 0);
 
     setStatus({
-      msg: success ? `✅ ${code} — 점검 완료 처리되었습니다` : `⚠️ 등록되지 않은 바코드: ${code}`,
+      msg: success ? `${code} — 점검 완료 처리되었습니다` : `등록되지 않은 바코드: ${code}`,
       type: success ? 'success' : 'error',
     });
 
@@ -143,7 +143,7 @@ export default function ScannerPage() {
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">{h.success ? '✅' : '⚠️'}</span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${h.success ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   <span className="font-mono text-sm font-semibold text-slate-700">{h.code}</span>
                 </div>
                 <span className="text-[11px] text-slate-400">

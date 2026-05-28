@@ -131,7 +131,6 @@ export default function AdminFaultsPage() {
 
       {reports.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
-          <p className="text-4xl mb-3">🎉</p>
           <p className="font-bold text-slate-700">접수된 고장 신고가 없습니다</p>
           <p className="text-sm text-slate-400 mt-1">모든 기자재가 정상 작동 중입니다.</p>
         </div>
