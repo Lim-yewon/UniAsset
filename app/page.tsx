@@ -51,7 +51,7 @@ export default function HomePage() {
     );
     const total = filtered.length;
     const faultyAssets = filtered.filter(
-      (a) => a.status === '수리요망' || a.status === '폐기'
+      (a) => a.status === '수리요망' || a.status === '수리중' || a.status === '폐기'
     );
     const faultyCount = faultyAssets.length;
     const faultyPercent = total === 0 ? 0 : Math.round((faultyCount / total) * 100);
@@ -71,7 +71,7 @@ export default function HomePage() {
   }, [assets, selectedDept]);
 
   const totalFaulty = useMemo(
-    () => assets.filter((a) => a.status === '수리요망' || a.status === '폐기').length,
+    () => assets.filter((a) => a.status === '수리요망' || a.status === '수리중' || a.status === '폐기').length,
     [assets]
   );
 
@@ -100,7 +100,7 @@ export default function HomePage() {
     {
       label: '고장 / 노후',
       value: totalFaulty,
-      sub: '수리요망 + 폐기 합계',
+      sub: '수리요망 + 수리중 + 폐기',
       bg: 'bg-red-50 border-red-100',
       valueColor: 'text-red-700',
     },
