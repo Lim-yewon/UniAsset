@@ -63,12 +63,9 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-sky-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-xl font-black text-white">UA</span>
+          <div className="flex justify-center mb-3">
+            <img src="/logo.png" alt="UniAssets" className="h-24 w-auto object-contain" />
           </div>
-          <h1 className="text-2xl font-black text-slate-800">
-            Uni<span className="text-sky-500">Asset</span>
-          </h1>
           <p className="text-slate-500 mt-1 text-sm">학교 계정으로 로그인하세요.</p>
         </div>
 

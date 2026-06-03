@@ -1,0 +1,22 @@
+{
+  "name": "UniAssets - 대학 기자재 관리",
+  "short_name": "UniAssets",
+  "description": "한신대학교 기자재 통합 관리 플랫폼",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

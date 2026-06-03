@@ -78,20 +78,39 @@ async function main() {
   let failed = 0;
 
   for (const user of USERS) {
-    // 1. Supabase Auth 계정 생성
+    // 1. Supabase Auth 계정 생성 (이미 존재하면 기존 계정 조회)
+    let authUuid;
     const { data, error } = await supabase.auth.admin.createUser({
       email: user.email,
       password: DEFAULT_PASSWORD,
-      email_confirm: true, // 이메일 인증 생략
+      email_confirm: true,
     });
 
     if (error) {
-      console.error(`  실패 [${user.userId}] ${user.name}: ${error.message}`);
-      failed++;
-      continue;
+      if (error.message.includes('already been registered') || error.message.includes('already exists')) {
+        // 이미 존재하는 계정 → 이메일로 조회
+        const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
+        if (listError) {
+          console.error(`  조회 실패 [${user.userId}] ${user.name}: ${listError.message}`);
+          failed++;
+          continue;
+        }
+        const existing = listData.users.find((u) => u.email === user.email);
+        if (!existing) {
+          console.error(`  계정 없음 [${user.userId}] ${user.name}`);
+          failed++;
+          continue;
+        }
+        authUuid = existing.id;
+        console.log(`  기존 계정 재사용 [${user.userId}] ${user.name}`);
+      } else {
+        console.error(`  실패 [${user.userId}] ${user.name}: ${error.message}`);
+        failed++;
+        continue;
+      }
+    } else {
+      authUuid = data.user.id;
     }
-
-    const authUuid = data.user.id;
 
     // 2. public.User 테이블에 user_uuid 연결
     const { error: updateError } = await supabase
