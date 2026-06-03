@@ -26,30 +26,24 @@ export default function RentalsPage() {
       .eq('user_id', user!.userId)
       .maybeSingle();
 
-    const majorName = (studentData?.major as any)?.major_name ?? null;
+    const majorName: string | null = (studentData?.major as any)?.major_name ?? null;
     setMyMajor(majorName);
 
-    // 학과 기준으로 대여 가능 기자재 필터링
-    let query = supabase
+    // 전체 대여 가능 기자재 조회 후 클라이언트에서 필터링 (TS 빌드 안정성)
+    const { data } = await supabase
       .from('assets')
       .select('*, rentals(status)')
       .eq('is_rentable', true)
       .eq('status', '정상');
 
-    if (majorName) {
-      query = query.eq('department', majorName);
-    }
-
-    const { data } = await query;
-
     if (data) {
       setAvailableAssets(
-        data.filter(
-          (asset) =>
-            !asset.rentals?.some(
-              (r: any) => r.status === '대여중' || r.status === '대여신청'
-            )
-        )
+        data.filter((asset) => {
+          if (majorName && asset.department !== majorName) return false;
+          return !asset.rentals?.some(
+            (r: any) => r.status === '대여중' || r.status === '대여신청'
+          );
+        })
       );
     }
   };
@@ -80,7 +74,7 @@ export default function RentalsPage() {
     if (error) {
       alert('신청 중 오류가 발생했습니다.');
     } else {
-      fetchAssets();
+      fetchMajorAndAssets();
     }
   };
 
