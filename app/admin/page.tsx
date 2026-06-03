@@ -23,9 +23,10 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [editForm, setEditForm] = useState({ room_id: '', status: '' });
-  const [photoModal, setPhotoModal] = useState<{ open: boolean; url: string | null; name: string }>({
-    open: false, url: null, name: '',
-  });
+  const [photoModal, setPhotoModal] = useState<{
+    open: boolean; url: string | null; name: string; assetId: string;
+  }>({ open: false, url: null, name: '', assetId: '' });
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -65,6 +66,52 @@ export default function AdminPage() {
     const { error } = await supabase.from('assets').delete().eq('asset_id', assetId);
     if (error) alert('삭제 실패: ' + error.message);
     else fetchData();
+  };
+
+  const handlePhotoUpload = async (file: File) => {
+    setPhotoUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${photoModal.assetId}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('asset_images')
+      .upload(fileName, file, { upsert: true });
+
+    if (uploadError) {
+      alert('업로드 실패: ' + uploadError.message);
+      setPhotoUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from('asset_images').getPublicUrl(fileName);
+
+    const { error: dbError } = await supabase
+      .from('assets')
+      .update({ asset_image: urlData.publicUrl })
+      .eq('asset_id', photoModal.assetId);
+
+    if (dbError) {
+      alert('DB 저장 실패: ' + dbError.message);
+    } else {
+      setPhotoModal((prev) => ({ ...prev, url: urlData.publicUrl }));
+      fetchData();
+    }
+    setPhotoUploading(false);
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!window.confirm('사진을 삭제하시겠습니까?')) return;
+    const { error } = await supabase
+      .from('assets')
+      .update({ asset_image: null })
+      .eq('asset_id', photoModal.assetId);
+
+    if (error) {
+      alert('삭제 실패: ' + error.message);
+    } else {
+      setPhotoModal((prev) => ({ ...prev, url: null }));
+      fetchData();
+    }
   };
 
   const openEditModal = (asset: any) => {
@@ -267,7 +314,7 @@ export default function AdminPage() {
                                 </div>
                                 <div className="flex gap-1.5">
                                   <button
-                                    onClick={() => setPhotoModal({ open: true, url: item.asset_image || null, name: item.model_name })}
+                                    onClick={() => setPhotoModal({ open: true, url: item.asset_image || null, name: item.model_name, assetId: item.asset_id })}
                                     className="px-2.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition"
                                   >
                                     사진
@@ -369,7 +416,7 @@ export default function AdminPage() {
                     <td className="p-4">
                       <div className="flex gap-1.5">
                         <button
-                          onClick={() => setPhotoModal({ open: true, url: asset.asset_image || null, name: asset.model_name })}
+                          onClick={() => setPhotoModal({ open: true, url: asset.asset_image || null, name: asset.model_name, assetId: asset.asset_id })}
                           className="px-2.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition"
                         >
                           사진
@@ -400,16 +447,17 @@ export default function AdminPage() {
       {photoModal.open && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setPhotoModal({ open: false, url: null, name: '' })}
+          onClick={() => setPhotoModal({ open: false, url: null, name: '', assetId: '' })}
         >
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 헤더 */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-800 text-sm truncate">{photoModal.name}</h3>
               <button
-                onClick={() => setPhotoModal({ open: false, url: null, name: '' })}
+                onClick={() => setPhotoModal({ open: false, url: null, name: '', assetId: '' })}
                 className="p-1.5 rounded-lg hover:bg-slate-100 transition text-slate-400 shrink-0 ml-2"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -417,20 +465,59 @@ export default function AdminPage() {
                 </svg>
               </button>
             </div>
+
+            {/* 사진 영역 */}
             {photoModal.url ? (
-              <img
-                src={photoModal.url}
-                alt={photoModal.name}
-                className="w-full object-contain max-h-[70vh]"
-              />
+              <img src={photoModal.url} alt={photoModal.name} className="w-full object-contain max-h-[55vh]" />
             ) : (
-              <div className="h-48 flex flex-col items-center justify-center gap-2 bg-slate-50">
+              <div className="h-44 flex flex-col items-center justify-center gap-2 bg-slate-50">
                 <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5a1.5 1.5 0 001.5 1.5z" />
                 </svg>
                 <p className="text-slate-400 text-sm font-semibold">등록된 사진이 없습니다</p>
               </div>
             )}
+
+            {/* 하단 버튼 영역 */}
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center gap-2">
+              {/* 사진 추가 / 변경 */}
+              <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition ${
+                photoUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-sky-600 text-white hover:bg-sky-700'
+              }`}>
+                {photoUploading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" />
+                    업로드 중...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    {photoModal.url ? '사진 변경' : '사진 추가'}
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={photoUploading}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) handlePhotoUpload(e.target.files[0]);
+                  }}
+                />
+              </label>
+
+              {/* 삭제 버튼 (사진 있을 때만) */}
+              {photoModal.url && (
+                <button
+                  onClick={handlePhotoDelete}
+                  className="px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition"
+                >
+                  삭제
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
