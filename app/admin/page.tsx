@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
 
 const STATUS_STYLE: Record<string, string> = {
   정상: 'bg-emerald-100 text-emerald-700',
@@ -13,10 +14,13 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function AdminPage() {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<any[]>([]);
   const [allRooms, setAllRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('전체');
+  // 로그인한 사용자의 담당 학과 정보
+  const [myDept, setMyDept] = useState<{ id: number | null; name: string | null }>({ id: null, name: null });
   const [selectedDept, setSelectedDept] = useState('전체');
   const [selectedLocation, setSelectedLocation] = useState('전체');
   const [selectedRoom, setSelectedRoom] = useState('전체');
@@ -58,8 +62,42 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!user) return;
+    const init = async () => {
+      // 담당 학과 조회
+      let deptId: number | null = null;
+      let deptName: string | null = null;
+
+      if (user.role === 'PROFESSOR') {
+        const { data } = await supabase
+          .from('major')
+          .select('major_id, major_name')
+          .eq('manager_uuid', user.authUuid)
+          .maybeSingle();
+        deptId = data?.major_id ?? null;
+        deptName = data?.major_name ?? null;
+      } else if (user.role === 'STAFF') {
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('major_id')
+          .eq('user_id', user.userId)
+          .maybeSingle();
+        if (staffData?.major_id) {
+          const { data: majorData } = await supabase
+            .from('major')
+            .select('major_name')
+            .eq('major_id', staffData.major_id)
+            .maybeSingle();
+          deptId = staffData.major_id;
+          deptName = majorData?.major_name ?? null;
+        }
+      }
+
+      setMyDept({ id: deptId, name: deptName });
+      fetchData();
+    };
+    init();
+  }, [user]);
 
   const handleDelete = async (assetId: string) => {
     if (!window.confirm('정말 이 기자재를 삭제하시겠습니까?')) return;
@@ -137,39 +175,48 @@ export default function AdminPage() {
     }
   };
 
+  // 담당 학과 기준으로 표시할 자산 범위 결정
+  const visibleAssets = useMemo(() => {
+    if (!myDept.name && !myDept.id) return assets;
+    return assets.filter((a) => {
+      if (a.is_rentable) return a.department === myDept.name;
+      return myDept.id ? a.owning_major_id === myDept.id : true;
+    });
+  }, [assets, myDept]);
+
   const departments = useMemo(() => {
-    const depts = assets.filter((a) => a.is_rentable).map((a) => a.department || '미지정');
+    const depts = visibleAssets.filter((a) => a.is_rentable).map((a) => a.department || '미지정');
     return ['전체', ...Array.from(new Set(depts))];
-  }, [assets]);
+  }, [visibleAssets]);
 
   const locations = useMemo(() => {
-    const locs = assets
+    const locs = visibleAssets
       .filter((a) => !a.is_rentable)
       .map((a) => a.room?.locations?.location_name || '미지정');
     return ['전체', ...Array.from(new Set(locs))];
-  }, [assets]);
+  }, [visibleAssets]);
 
   const rooms = useMemo(() => {
-    const filtered = assets.filter(
+    const filtered = visibleAssets.filter(
       (a) =>
         !a.is_rentable &&
         (selectedLocation === '전체' ||
           (a.room?.locations?.location_name || '미지정') === selectedLocation)
     );
     return ['전체', ...Array.from(new Set(filtered.map((a) => a.room?.room_number || '미지정')))];
-  }, [assets, selectedLocation]);
+  }, [visibleAssets, selectedLocation]);
 
-  const rentalAssets = assets.filter(
+  const rentalAssets = visibleAssets.filter(
     (a) => a.is_rentable && (selectedDept === '전체' || a.department === selectedDept)
   );
 
-  const allAssetsFiltered = assets.filter((a) => {
+  const allAssetsFiltered = visibleAssets.filter((a) => {
     if (filter === '대여용') return a.is_rentable;
     if (filter === '고정') return !a.is_rentable;
     return true;
   });
 
-  const groupedFixedAssets = assets
+  const groupedFixedAssets = visibleAssets
     .filter(
       (a) =>
         !a.is_rentable &&
@@ -209,9 +256,17 @@ export default function AdminPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">자산 관리 대장</h1>
           <p className="text-slate-500 text-sm mt-1">전체 기자재 현황을 조회하고 관리합니다.</p>
+          {myDept.name && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="text-xs text-slate-400">담당 학과:</span>
+              <span className="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                {myDept.name}
+              </span>
+            </div>
+          )}
         </div>
         <div className="shrink-0 px-3 py-1.5 bg-slate-100 rounded-lg">
-          <span className="text-xs font-semibold text-slate-600">전체 {assets.length}개</span>
+          <span className="text-xs font-semibold text-slate-600">{visibleAssets.length}개</span>
         </div>
       </div>
 
