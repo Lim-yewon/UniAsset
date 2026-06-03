@@ -19,17 +19,26 @@ export default function RentalsPage() {
   }, [authLoading, user]);
 
   const fetchMajorAndAssets = async () => {
-    // 학생의 학과 조회
+    // Step 1: 학생 테이블에서 major_id 조회
     const { data: studentData } = await supabase
       .from('student')
-      .select('major_id, major:major_id(major_name)')
+      .select('major_id')
       .eq('user_id', user!.userId)
       .maybeSingle();
 
-    const majorName: string | null = (studentData?.major as any)?.major_name ?? null;
+    // Step 2: major_id로 학과명 별도 조회 (FK join 없이)
+    let majorName: string | null = null;
+    if (studentData?.major_id) {
+      const { data: majorData } = await supabase
+        .from('major')
+        .select('major_name')
+        .eq('major_id', studentData.major_id)
+        .maybeSingle();
+      majorName = majorData?.major_name ?? null;
+    }
     setMyMajor(majorName);
 
-    // 전체 대여 가능 기자재 조회 후 클라이언트에서 필터링 (TS 빌드 안정성)
+    // Step 3: 전체 대여 가능 기자재 조회 후 클라이언트 필터링
     const { data } = await supabase
       .from('assets')
       .select('*, rentals(status)')
