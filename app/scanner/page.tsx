@@ -258,7 +258,13 @@ export default function ScannerPage() {
           className="relative rounded-2xl overflow-hidden shadow-xl border-4 border-white bg-black"
           style={{ aspectRatio: '4/3' }}
         >
-          <video ref={ref} className="w-full h-full object-cover" />
+          <video
+            ref={ref}
+            className="w-full h-full object-cover"
+            playsInline
+            muted
+            autoPlay
+          />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="relative w-44 h-44">
               <span className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-sky-400 rounded-tl-lg" />
