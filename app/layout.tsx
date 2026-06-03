@@ -153,7 +153,7 @@ function Sidebar() {
     <>
       {/* ── 모바일 상단 바 ── */}
       <div className="md:hidden sticky top-0 bg-slate-900 text-white flex items-center justify-between px-4 py-2.5 shadow-lg z-50">
-        <DarkLogo cls="h-8" />
+        <DarkLogo cls="h-10" />
   <button
           onClick={() => setMobileOpen(true)}
           className="p-2 rounded-xl hover:bg-slate-700 transition text-slate-300"
@@ -174,7 +174,7 @@ function Sidebar() {
           />
           <div className="relative w-64 bg-slate-900 flex flex-col shadow-2xl">
             <div className="px-4 py-3 border-b border-slate-700/60 flex items-center justify-between">
-              <DarkLogo cls="h-8" />
+              <DarkLogo cls="h-10" />
               <button
                 onClick={() => setMobileOpen(false)}
                 className="p-2 rounded-xl hover:bg-slate-700 transition text-slate-400"
@@ -193,7 +193,7 @@ function Sidebar() {
       {/* ── 데스크탑 사이드바 ── */}
       <nav className="hidden md:flex bg-slate-900 text-white w-60 shrink-0 flex-col shadow-2xl z-50 min-h-screen">
         <div className="px-5 py-5 border-b border-slate-700/60 flex items-center justify-center">
-          <DarkLogo cls="h-10" />
+          <DarkLogo cls="h-14" />
         </div>
         <NavContent />
       </nav>

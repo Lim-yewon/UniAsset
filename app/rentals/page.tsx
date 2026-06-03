@@ -11,18 +11,36 @@ export default function RentalsPage() {
   const [myRentals, setMyRentals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [myMajor, setMyMajor] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading || !user) return;
-    Promise.all([fetchAssets(), fetchMyRentals()]).finally(() => setLoading(false));
+    Promise.all([fetchMajorAndAssets(), fetchMyRentals()]).finally(() => setLoading(false));
   }, [authLoading, user]);
 
-  const fetchAssets = async () => {
-    const { data } = await supabase
+  const fetchMajorAndAssets = async () => {
+    // 학생의 학과 조회
+    const { data: studentData } = await supabase
+      .from('student')
+      .select('major_id, major:major_id(major_name)')
+      .eq('user_id', user!.userId)
+      .maybeSingle();
+
+    const majorName = (studentData?.major as any)?.major_name ?? null;
+    setMyMajor(majorName);
+
+    // 학과 기준으로 대여 가능 기자재 필터링
+    let query = supabase
       .from('assets')
       .select('*, rentals(status)')
       .eq('is_rentable', true)
       .eq('status', '정상');
+
+    if (majorName) {
+      query = query.eq('department', majorName);
+    }
+
+    const { data } = await query;
 
     if (data) {
       setAvailableAssets(
@@ -110,8 +128,16 @@ export default function RentalsPage() {
         <p className="text-sm text-slate-500 mt-1">
           반갑습니다,{' '}
           <span className="font-bold text-sky-600">{user?.name}</span>님.
-          대여 가능한 기자재 목록을 확인하세요.
         </p>
+        {myMajor && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <span className="text-xs text-slate-400">소속 학과:</span>
+            <span className="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+              {myMajor}
+            </span>
+            <span className="text-xs text-slate-400">기자재만 표시 중</span>
+          </div>
+        )}
       </div>
 
       {/* Tab Switcher — 모바일에서 전체 너비 */}

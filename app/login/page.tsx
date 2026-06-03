@@ -64,7 +64,7 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-3">
-            <img src="/logo.png" alt="UniAssets" className="h-24 w-auto object-contain" />
+            <img src="/logo.png" alt="UniAssets" className="h-36 w-auto object-contain" />
           </div>
           <p className="text-slate-500 mt-1 text-sm">학교 계정으로 로그인하세요.</p>
         </div>
