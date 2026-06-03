@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useZxing } from 'react-zxing';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 
@@ -16,27 +15,84 @@ type AssetItem = {
 
 type ScanMsg = { msg: string; type: 'idle' | 'success' | 'error' };
 
+const SCANNER_ID = 'uniasset-qr-scanner';
+
 export default function ScannerPage() {
   const { user } = useAuth();
   const [assignedRoom, setAssignedRoom] = useState<any>(null);
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [loadingRoom, setLoadingRoom] = useState(true);
-  const [lastScan, setLastScan] = useState('');
-  const [scanMsg, setScanMsg] = useState<ScanMsg>({
-    msg: '바코드를 카메라에 인식시켜주세요',
-    type: 'idle',
-  });
+  const [scanMsg, setScanMsg] = useState<ScanMsg>({ msg: '바코드를 카메라에 인식시켜주세요', type: 'idle' });
   const [manual, setManual] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [submittedCount, setSubmittedCount] = useState(0);
 
-  useEffect(() => {
-    if (!user) return;
-    fetchAssignment();
-  }, [user]);
+  const scannerRef = useRef<any>(null);
+  const lastScanRef = useRef('');
+  const lastScanTimeRef = useRef(0);
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchAssignment = async () => {
+  const flashMsg = useCallback((msg: string, type: ScanMsg['type']) => {
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    setScanMsg({ msg, type });
+    flashTimeoutRef.current = setTimeout(
+      () => setScanMsg({ msg: '바코드를 카메라에 인식시켜주세요', type: 'idle' }),
+      2500
+    );
+  }, []);
+
+  const checkByBarcode = useCallback((code: string) => {
+    // 2초 안에 같은 바코드 중복 처리 방지
+    const now = Date.now();
+    if (code === lastScanRef.current && now - lastScanTimeRef.current < 2000) return;
+    lastScanRef.current = code;
+    lastScanTimeRef.current = now;
+
+    setAssets((prev) => {
+      const idx = prev.findIndex((a) => a.barcode === code);
+      if (idx < 0) {
+        flashMsg(`이 강의실에 없는 기자재: ${code}`, 'error');
+        return prev;
+      }
+      if (prev[idx].checked) {
+        flashMsg(`이미 체크됨: ${prev[idx].model_name}`, 'idle');
+        return prev;
+      }
+      flashMsg(`${prev[idx].model_name} — 체크 완료`, 'success');
+      return prev.map((a, i) => (i === idx ? { ...a, checked: true } : a));
+    });
+  }, [flashMsg]);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch (_) {}
+      scannerRef.current = null;
+    }
+  }, []);
+
+  const startScanner = useCallback(async () => {
+    await stopScanner();
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const scanner = new Html5Qrcode(SCANNER_ID);
+      scannerRef.current = scanner;
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText: string) => checkByBarcode(decodedText),
+        undefined // suppress frame-level errors
+      );
+    } catch (err) {
+      console.error('카메라 시작 실패:', err);
+      setScanMsg({ msg: '카메라를 시작할 수 없습니다. 권한을 확인해주세요.', type: 'error' });
+    }
+  }, [checkByBarcode, stopScanner]);
+
+  const fetchAssignment = useCallback(async () => {
     setLoadingRoom(true);
     setDone(false);
     setAssets([]);
@@ -44,9 +100,7 @@ export default function ScannerPage() {
 
     const { data: authData } = await supabase
       .from('authorization')
-      .select(
-        'target_room_id, room:target_room_id(room_id, room_number, locations:location_id(location_name))'
-      )
+      .select('target_room_id, room:target_room_id(room_id, room_number, locations:location_id(location_name))')
       .eq('student_id', user!.userId)
       .order('start_date', { ascending: false })
       .limit(1)
@@ -54,7 +108,6 @@ export default function ScannerPage() {
 
     if (authData?.target_room_id) {
       setAssignedRoom(authData.room);
-
       const { data: assetData } = await supabase
         .from('assets')
         .select('asset_id, barcode, model_name, status')
@@ -67,78 +120,53 @@ export default function ScannerPage() {
           assetData.map((a) => ({
             ...a,
             checked: false,
-            newStatus: ['수리요망', '수리중', '폐기'].includes(a.status)
-              ? a.status
-              : '정상',
+            newStatus: ['수리요망', '수리중', '폐기'].includes(a.status) ? a.status : '정상',
           }))
         );
       }
     }
-
     setLoadingRoom(false);
-  };
+  }, [user]);
 
-  const flashMsg = (msg: string, type: ScanMsg['type']) => {
-    setScanMsg({ msg, type });
-    setTimeout(
-      () => setScanMsg({ msg: '바코드를 카메라에 인식시켜주세요', type: 'idle' }),
-      2500
-    );
-  };
+  useEffect(() => {
+    if (!user) return;
+    fetchAssignment();
+    return () => { stopScanner(); };
+  }, [user]);
 
-  const checkByBarcode = (code: string) => {
-    setAssets((prev) => {
-      const idx = prev.findIndex((a) => a.barcode === code);
-      if (idx < 0) {
-        flashMsg(`이 강의실에 없는 기자재: ${code}`, 'error');
-        return prev;
-      }
-      if (prev[idx].checked) {
-        flashMsg(`이미 체크된 기자재: ${prev[idx].model_name}`, 'idle');
-        return prev;
-      }
-      flashMsg(`${prev[idx].model_name} — 체크 완료`, 'success');
-      return prev.map((a, i) => (i === idx ? { ...a, checked: true } : a));
-    });
-  };
+  // 배정 강의실 로드 완료 후 스캐너 시작
+  useEffect(() => {
+    if (assignedRoom) {
+      // DOM이 렌더된 후 스캐너 초기화
+      const timer = setTimeout(() => startScanner(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [assignedRoom]);
 
-  const { ref } = useZxing({
-    onResult(result: any) {
-      const code = result.getText();
-      if (code !== lastScan) {
-        setLastScan(code);
-        checkByBarcode(code);
-      }
-    },
-    constraints: {
-      video: {
-        facingMode: { ideal: 'environment' }, // 후면 카메라 사용
-      },
-    },
-  });
+  // 페이지 언마운트 시 스캐너 정리
+  useEffect(() => {
+    return () => { stopScanner(); };
+  }, [stopScanner]);
 
   const checkedCount = assets.filter((a) => a.checked).length;
   const totalCount = assets.length;
   const progress = totalCount === 0 ? 0 : Math.round((checkedCount / totalCount) * 100);
 
   const handleSubmit = async () => {
-    if (checkedCount === 0) {
-      alert('체크된 기자재가 없습니다.');
-      return;
-    }
-    if (!window.confirm(`${checkedCount}개 기자재의 재물조사를 완료 처리하시겠습니까?`))
-      return;
-
+    if (checkedCount === 0) { alert('체크된 기자재가 없습니다.'); return; }
+    if (!window.confirm(`${checkedCount}개 기자재의 재물조사를 완료 처리하시겠습니까?`)) return;
     setSubmitting(true);
-    const updates = assets
-      .filter((a) => a.checked)
-      .map((a) =>
-        supabase
-          .from('assets')
-          .update({ status: a.newStatus === '정상' ? '점검완료' : a.newStatus })
-          .eq('asset_id', a.asset_id)
-      );
-    await Promise.all(updates);
+    await stopScanner();
+    await Promise.all(
+      assets
+        .filter((a) => a.checked)
+        .map((a) =>
+          supabase
+            .from('assets')
+            .update({ status: a.newStatus === '정상' ? '점검완료' : a.newStatus })
+            .eq('asset_id', a.asset_id)
+        )
+    );
     setSubmittedCount(checkedCount);
     setSubmitting(false);
     setDone(true);
@@ -162,34 +190,23 @@ export default function ScannerPage() {
     );
   }
 
-  /* ── 완료 화면 ── */
+  /* ── 완료 ── */
   if (done) {
     return (
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-12 text-center">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-emerald-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
+            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">재물조사 완료</h2>
           <p className="text-slate-500 text-sm mb-1">
-            {assignedRoom
-              ? `${(assignedRoom.locations as any)?.location_name} ${assignedRoom.room_number}`
-              : ''}
+            {assignedRoom ? `${(assignedRoom.locations as any)?.location_name} ${assignedRoom.room_number}` : ''}
           </p>
           <p className="text-2xl font-black text-sky-600 my-4">{submittedCount}개</p>
           <p className="text-slate-400 text-sm mb-8">기자재가 점검 완료 처리되었습니다.</p>
-          <button
-            onClick={fetchAssignment}
-            className="px-6 py-2.5 bg-sky-600 text-white rounded-xl font-semibold text-sm hover:bg-sky-700 transition"
-          >
+          <button onClick={fetchAssignment} className="px-6 py-2.5 bg-sky-600 text-white rounded-xl font-semibold text-sm hover:bg-sky-700 transition">
             다시 시작
           </button>
         </div>
@@ -209,15 +226,13 @@ export default function ScannerPage() {
             </svg>
           </div>
           <h2 className="text-lg font-bold text-slate-800 mb-2">배정된 강의실 없음</h2>
-          <p className="text-slate-500 text-sm">
-            관리자에게 담당 강의실 배정을 요청하세요.
-          </p>
+          <p className="text-slate-500 text-sm">관리자에게 담당 강의실 배정을 요청하세요.</p>
         </div>
       </div>
     );
   }
 
-  /* ── 메인 화면 ── */
+  /* ── 메인 ── */
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-10">
       {/* 헤더 */}
@@ -235,48 +250,28 @@ export default function ScannerPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
         <div className="flex justify-between items-center mb-2">
           <p className="text-sm font-bold text-slate-700">진행 현황</p>
-          <span className="text-sm font-black text-sky-600">
-            {checkedCount} / {totalCount}개 ({progress}%)
-          </span>
+          <span className="text-sm font-black text-sky-600">{checkedCount} / {totalCount}개 ({progress}%)</span>
         </div>
         <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-          <div
-            className="bg-sky-500 h-full rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+          <div className="bg-sky-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
         {checkedCount === totalCount && totalCount > 0 && (
-          <p className="text-emerald-600 text-xs font-bold mt-2 text-center">
-            모든 기자재 점검 완료!
-          </p>
+          <p className="text-emerald-600 text-xs font-bold mt-2 text-center">모든 기자재 점검 완료!</p>
         )}
       </div>
 
       {/* 카메라 스캐너 */}
       <div className="space-y-3">
-        <div
-          className="relative rounded-2xl overflow-hidden shadow-xl border-4 border-white bg-black"
-          style={{ aspectRatio: '4/3' }}
-        >
-          <video
-            ref={ref}
-            className="w-full h-full object-cover"
-            playsInline
-            muted
-            autoPlay
+        {/* html5-qrcode가 렌더링하는 컨테이너 */}
+        <div className="rounded-2xl overflow-hidden shadow-xl border-4 border-white bg-black">
+          <div
+            id={SCANNER_ID}
+            className="w-full"
+            style={{ minHeight: '260px' }}
           />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="relative w-44 h-44">
-              <span className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-sky-400 rounded-tl-lg" />
-              <span className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-sky-400 rounded-tr-lg" />
-              <span className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-sky-400 rounded-bl-lg" />
-              <span className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-sky-400 rounded-br-lg" />
-              <div className="absolute inset-x-0 top-1/2 h-0.5 bg-sky-400/50 animate-pulse" />
-            </div>
-          </div>
         </div>
 
-        {/* 스캔 상태 */}
+        {/* 스캔 상태 메시지 */}
         <div className={`p-3 rounded-xl transition-all ${scanMsgStyle[scanMsg.type]}`}>
           <p className="text-sm font-bold">{scanMsg.msg}</p>
         </div>
@@ -296,12 +291,7 @@ export default function ScannerPage() {
             placeholder="바코드 직접 입력 후 Enter"
           />
           <button
-            onClick={() => {
-              if (manual.trim()) {
-                checkByBarcode(manual.trim());
-                setManual('');
-              }
-            }}
+            onClick={() => { if (manual.trim()) { checkByBarcode(manual.trim()); setManual(''); } }}
             className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-900 transition"
           >
             확인
@@ -312,89 +302,48 @@ export default function ScannerPage() {
       {/* 기자재 체크리스트 */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-            강의실 기자재 목록
-          </h2>
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">강의실 기자재 목록</h2>
           <div className="flex gap-2 text-xs font-bold">
-            <button
-              onClick={() => setAssets((prev) => prev.map((a) => ({ ...a, checked: true })))}
-              className="text-sky-600 hover:underline"
-            >
-              전체선택
-            </button>
+            <button onClick={() => setAssets((p) => p.map((a) => ({ ...a, checked: true })))} className="text-sky-600 hover:underline">전체선택</button>
             <span className="text-slate-300">|</span>
-            <button
-              onClick={() => setAssets((prev) => prev.map((a) => ({ ...a, checked: false })))}
-              className="text-slate-400 hover:underline"
-            >
-              초기화
-            </button>
+            <button onClick={() => setAssets((p) => p.map((a) => ({ ...a, checked: false })))} className="text-slate-400 hover:underline">초기화</button>
           </div>
         </div>
 
         {assets.length === 0 ? (
           <div className="p-10 text-center">
-            <p className="text-slate-400 text-sm font-semibold">
-              이 강의실에 등록된 기자재가 없습니다.
-            </p>
+            <p className="text-slate-400 text-sm font-semibold">이 강의실에 등록된 기자재가 없습니다.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {assets.map((asset, idx) => (
               <div
                 key={asset.asset_id}
-                className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                  asset.checked ? 'bg-emerald-50' : 'bg-white'
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 transition-colors ${asset.checked ? 'bg-emerald-50' : 'bg-white'}`}
               >
-                {/* 체크박스 */}
                 <button
-                  onClick={() =>
-                    setAssets((prev) =>
-                      prev.map((a, i) => (i === idx ? { ...a, checked: !a.checked } : a))
-                    )
-                  }
+                  onClick={() => setAssets((p) => p.map((a, i) => (i === idx ? { ...a, checked: !a.checked } : a)))}
                   className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all active:scale-90 ${
-                    asset.checked
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'border-slate-300 hover:border-sky-400 bg-white'
+                    asset.checked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-sky-400 bg-white'
                   }`}
                 >
                   {asset.checked && (
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </button>
 
-                {/* 기자재 정보 */}
                 <div className="flex-1 min-w-0">
-                  <p
-                    className={`font-semibold text-sm truncate ${
-                      asset.checked ? 'text-emerald-800 line-through opacity-70' : 'text-slate-800'
-                    }`}
-                  >
+                  <p className={`font-semibold text-sm truncate ${asset.checked ? 'text-emerald-800 line-through opacity-70' : 'text-slate-800'}`}>
                     {asset.model_name}
                   </p>
                   <p className="text-xs text-slate-400 font-mono">{asset.barcode}</p>
                 </div>
 
-                {/* 상태 선택 */}
                 <select
                   value={asset.newStatus}
-                  onChange={(e) =>
-                    setAssets((prev) =>
-                      prev.map((a, i) =>
-                        i === idx ? { ...a, newStatus: e.target.value } : a
-                      )
-                    )
-                  }
+                  onChange={(e) => setAssets((p) => p.map((a, i) => (i === idx ? { ...a, newStatus: e.target.value } : a)))}
                   className="shrink-0 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-sky-500 bg-white"
                 >
                   <option value="정상">정상</option>
@@ -408,7 +357,7 @@ export default function ScannerPage() {
         )}
       </div>
 
-      {/* 제출 버튼 */}
+      {/* 제출 */}
       <button
         onClick={handleSubmit}
         disabled={submitting || checkedCount === 0}
