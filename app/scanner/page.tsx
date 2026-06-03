@@ -110,6 +110,11 @@ export default function ScannerPage() {
         checkByBarcode(code);
       }
     },
+    constraints: {
+      video: {
+        facingMode: { ideal: 'environment' }, // 후면 카메라 사용
+      },
+    },
   });
 
   const checkedCount = assets.filter((a) => a.checked).length;
