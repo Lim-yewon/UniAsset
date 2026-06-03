@@ -14,22 +14,42 @@ export default function AuthManagePage() {
   const [successMap, setSuccessMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) fetchData();
+  }, [user]);
 
   const fetchData = async () => {
     setLoading(true);
 
-    // 근로장학생 목록
-    const { data: studentData, error } = await supabase
+    // 로그인한 교직원/교수의 담당 학과 major_id 조회
+    let myMajorId: number | null = null;
+
+    if (user?.role === 'PROFESSOR') {
+      const { data } = await supabase
+        .from('major')
+        .select('major_id')
+        .eq('manager_uuid', user.authUuid)
+        .maybeSingle();
+      myMajorId = data?.major_id ?? null;
+    } else if (user?.role === 'STAFF') {
+      const { data } = await supabase
+        .from('staff')
+        .select('major_id')
+        .eq('user_id', user.userId)
+        .maybeSingle();
+      myMajorId = data?.major_id ?? null;
+    }
+
+    // 담당 학과 근로장학생만 조회 (major_id 기준)
+    let query = supabase
       .from('student')
-      .select(`
-        user_id,
-        is_work_study,
-        User (name, role)
-      `)
+      .select('user_id, is_work_study, major_id, User (name, role)')
       .eq('is_work_study', true);
 
+    if (myMajorId) {
+      query = query.eq('major_id', myMajorId);
+    }
+
+    const { data: studentData, error } = await query;
     if (error) console.error('학생 조회 에러:', error);
     setStudents(studentData || []);
 
