@@ -106,7 +106,7 @@ function Sidebar() {
                 근로 공간
               </p>
             </div>
-            <NavLink href="/scanner" label="재물조사 스캐너" color="text-emerald-400" onClick={onClose} />
+            <NavLink href="/scanner" label="재물조사" color="text-emerald-400" onClick={onClose} />
           </>
         )}
         {isAdmin && (
@@ -229,7 +229,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="UniAssets" />
         <link rel="apple-touch-icon" href="/logo.png" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

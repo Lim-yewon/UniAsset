@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 
@@ -19,11 +19,14 @@ const SCANNER_ID = 'uniasset-qr-scanner';
 
 export default function ScannerPage() {
   const { user } = useAuth();
-  const [assignedRoom, setAssignedRoom] = useState<any>(null);
+  const [assignedRooms, setAssignedRooms] = useState<any[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [loadingRoom, setLoadingRoom] = useState(true);
+  const [loadingAssets, setLoadingAssets] = useState(false);
   const [scanMsg, setScanMsg] = useState<ScanMsg>({ msg: '바코드를 카메라에 인식시켜주세요', type: 'idle' });
-  const [manual, setManual] = useState('');
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [submittedCount, setSubmittedCount] = useState(0);
@@ -32,6 +35,16 @@ export default function ScannerPage() {
   const lastScanRef = useRef('');
   const lastScanTimeRef = useRef(0);
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 자동완성 후보 (바코드 또는 모델명으로 검색)
+  const suggestions = useMemo(() => {
+    if (!barcodeInput.trim() || barcodeInput.length < 1) return [];
+    const q = barcodeInput.toLowerCase();
+    return assets
+      .filter(a => a.barcode.toLowerCase().includes(q) || a.model_name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [barcodeInput, assets]);
 
   const flashMsg = useCallback((msg: string, type: ScanMsg['type']) => {
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
@@ -43,7 +56,6 @@ export default function ScannerPage() {
   }, []);
 
   const checkByBarcode = useCallback((code: string) => {
-    // 2초 안에 같은 바코드 중복 처리 방지
     const now = Date.now();
     if (code === lastScanRef.current && now - lastScanTimeRef.current < 2000) return;
     lastScanRef.current = code;
@@ -66,10 +78,7 @@ export default function ScannerPage() {
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch (_) {}
+      try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch (_) {}
       scannerRef.current = null;
     }
   }, []);
@@ -84,73 +93,81 @@ export default function ScannerPage() {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 220, height: 220 } },
         (decodedText: string) => checkByBarcode(decodedText),
-        undefined // suppress frame-level errors
+        undefined
       );
     } catch (err) {
       console.error('카메라 시작 실패:', err);
-      setScanMsg({ msg: '카메라를 시작할 수 없습니다. 권한을 확인해주세요.', type: 'error' });
     }
   }, [checkByBarcode, stopScanner]);
 
-  const fetchAssignment = useCallback(async () => {
+  // 배정된 강의실 목록 로드
+  const fetchAssignedRooms = useCallback(async () => {
+    if (!user) return;
     setLoadingRoom(true);
-    setDone(false);
-    setAssets([]);
-    setAssignedRoom(null);
+    const { data } = await supabase
+      .from('work_room_assignment')
+      .select('room_id, room:room_id(room_id, room_number, locations:location_id(location_name))')
+      .eq('student_id', user.userId)
+      .order('assigned_at', { ascending: true });
 
-    const { data: authData } = await supabase
-      .from('authorization')
-      .select('target_room_id, room:target_room_id(room_id, room_number, locations:location_id(location_name))')
-      .eq('student_id', user!.userId)
-      .order('start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const rooms = (data || []).map(d => d.room);
+    setAssignedRooms(rooms);
 
-    if (authData?.target_room_id) {
-      setAssignedRoom(authData.room);
-      const { data: assetData } = await supabase
-        .from('assets')
-        .select('asset_id, barcode, model_name, status')
-        .eq('room_id', authData.target_room_id)
-        .eq('is_rentable', false)
-        .order('model_name');
-
-      if (assetData) {
-        setAssets(
-          assetData.map((a) => ({
-            ...a,
-            checked: false,
-            newStatus: ['수리요망', '수리중', '폐기'].includes(a.status) ? a.status : '정상',
-          }))
-        );
-      }
+    // 강의실이 1개면 자동 선택
+    if (rooms.length === 1) {
+      setSelectedRoomId((rooms[0] as any)?.room_id ?? null);
     }
     setLoadingRoom(false);
   }, [user]);
 
+  // 선택된 강의실의 기자재 로드
+  const fetchRoomAssets = useCallback(async (roomId: number) => {
+    setLoadingAssets(true);
+    setAssets([]);
+    setDone(false);
+
+    const { data } = await supabase
+      .from('assets')
+      .select('asset_id, barcode, model_name, status')
+      .eq('room_id', roomId)
+      .eq('is_rentable', false)
+      .order('model_name');
+
+    if (data) {
+      setAssets(data.map(a => ({
+        ...a,
+        checked: false,
+        newStatus: ['수리요망', '수리중', '폐기'].includes(a.status) ? a.status : '정상',
+      })));
+    }
+    setLoadingAssets(false);
+  }, []);
+
   useEffect(() => {
-    if (!user) return;
-    fetchAssignment();
+    if (user) fetchAssignedRooms();
     return () => { stopScanner(); };
   }, [user]);
 
-  // 배정 강의실 로드 완료 후 스캐너 시작
   useEffect(() => {
-    if (assignedRoom) {
-      // DOM이 렌더된 후 스캐너 초기화
+    if (selectedRoomId) {
+      fetchRoomAssets(selectedRoomId);
+    }
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    if (selectedRoomId && assets.length > 0 && !loadingAssets) {
       const timer = setTimeout(() => startScanner(), 300);
       return () => clearTimeout(timer);
     }
-  }, [assignedRoom]);
+  }, [selectedRoomId, loadingAssets]);
 
-  // 페이지 언마운트 시 스캐너 정리
-  useEffect(() => {
-    return () => { stopScanner(); };
-  }, [stopScanner]);
+  useEffect(() => { return () => { stopScanner(); }; }, [stopScanner]);
 
-  const checkedCount = assets.filter((a) => a.checked).length;
+  const checkedCount = assets.filter(a => a.checked).length;
   const totalCount = assets.length;
   const progress = totalCount === 0 ? 0 : Math.round((checkedCount / totalCount) * 100);
+
+  const selectedRoom = assignedRooms.find(r => r?.room_id === selectedRoomId);
 
   const handleSubmit = async () => {
     if (checkedCount === 0) { alert('체크된 기자재가 없습니다.'); return; }
@@ -158,14 +175,11 @@ export default function ScannerPage() {
     setSubmitting(true);
     await stopScanner();
     await Promise.all(
-      assets
-        .filter((a) => a.checked)
-        .map((a) =>
-          supabase
-            .from('assets')
-            .update({ status: a.newStatus === '정상' ? '점검완료' : a.newStatus })
-            .eq('asset_id', a.asset_id)
-        )
+      assets.filter(a => a.checked).map(a =>
+        supabase.from('assets')
+          .update({ status: a.newStatus === '정상' ? '점검완료' : a.newStatus })
+          .eq('asset_id', a.asset_id)
+      )
     );
     setSubmittedCount(checkedCount);
     setSubmitting(false);
@@ -190,32 +204,8 @@ export default function ScannerPage() {
     );
   }
 
-  /* ── 완료 ── */
-  if (done) {
-    return (
-      <div className="max-w-md mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-12 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">재물조사 완료</h2>
-          <p className="text-slate-500 text-sm mb-1">
-            {assignedRoom ? `${(assignedRoom.locations as any)?.location_name} ${assignedRoom.room_number}` : ''}
-          </p>
-          <p className="text-2xl font-black text-sky-600 my-4">{submittedCount}개</p>
-          <p className="text-slate-400 text-sm mb-8">기자재가 점검 완료 처리되었습니다.</p>
-          <button onClick={fetchAssignment} className="px-6 py-2.5 bg-sky-600 text-white rounded-xl font-semibold text-sm hover:bg-sky-700 transition">
-            다시 시작
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   /* ── 배정 없음 ── */
-  if (!assignedRoom) {
+  if (assignedRooms.length === 0) {
     return (
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-2xl border border-dashed border-amber-300 p-12 text-center">
@@ -232,146 +222,234 @@ export default function ScannerPage() {
     );
   }
 
-  /* ── 메인 ── */
-  return (
-    <div className="max-w-lg mx-auto space-y-4 pb-10">
-      {/* 헤더 */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">재물조사 스캐너</h1>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-slate-500 text-sm">담당 강의실:</span>
-          <span className="font-bold text-sky-600 text-sm bg-sky-50 px-2.5 py-0.5 rounded-full">
-            {(assignedRoom.locations as any)?.location_name} {assignedRoom.room_number}
-          </span>
-        </div>
-      </div>
-
-      {/* 진행 현황 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-sm font-bold text-slate-700">진행 현황</p>
-          <span className="text-sm font-black text-sky-600">{checkedCount} / {totalCount}개 ({progress}%)</span>
-        </div>
-        <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-          <div className="bg-sky-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-        </div>
-        {checkedCount === totalCount && totalCount > 0 && (
-          <p className="text-emerald-600 text-xs font-bold mt-2 text-center">모든 기자재 점검 완료!</p>
-        )}
-      </div>
-
-      {/* 카메라 스캐너 */}
-      <div className="space-y-3">
-        {/* html5-qrcode가 렌더링하는 컨테이너 */}
-        <div className="rounded-2xl overflow-hidden shadow-xl border-4 border-white bg-black">
-          <div
-            id={SCANNER_ID}
-            className="w-full"
-            style={{ minHeight: '260px' }}
-          />
-        </div>
-
-        {/* 스캔 상태 메시지 */}
-        <div className={`p-3 rounded-xl transition-all ${scanMsgStyle[scanMsg.type]}`}>
-          <p className="text-sm font-bold">{scanMsg.msg}</p>
-        </div>
-
-        {/* 직접 입력 */}
-        <div className="flex gap-2">
-          <input
-            value={manual}
-            onChange={(e) => setManual(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && manual.trim()) {
-                checkByBarcode(manual.trim());
-                setManual('');
-              }
-            }}
-            className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-sm font-mono transition"
-            placeholder="바코드 직접 입력 후 Enter"
-          />
+  /* ── 완료 화면 ── */
+  if (done) {
+    return (
+      <div className="max-w-md mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-12 text-center">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">재물조사 완료</h2>
+          <p className="text-slate-500 text-sm mb-1">
+            {selectedRoom ? `${(selectedRoom.locations as any)?.location_name} ${selectedRoom.room_number}` : ''}
+          </p>
+          <p className="text-2xl font-black text-sky-600 my-4">{submittedCount}개</p>
+          <p className="text-slate-400 text-sm mb-8">기자재가 점검 완료 처리되었습니다.</p>
           <button
-            onClick={() => { if (manual.trim()) { checkByBarcode(manual.trim()); setManual(''); } }}
-            className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-900 transition"
+            onClick={() => { setDone(false); if (selectedRoomId) fetchRoomAssets(selectedRoomId); }}
+            className="px-6 py-2.5 bg-sky-600 text-white rounded-xl font-semibold text-sm hover:bg-sky-700 transition"
           >
-            확인
+            다시 시작
           </button>
         </div>
       </div>
+    );
+  }
 
-      {/* 기자재 체크리스트 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">강의실 기자재 목록</h2>
-          <div className="flex gap-2 text-xs font-bold">
-            <button onClick={() => setAssets((p) => p.map((a) => ({ ...a, checked: true })))} className="text-sky-600 hover:underline">전체선택</button>
-            <span className="text-slate-300">|</span>
-            <button onClick={() => setAssets((p) => p.map((a) => ({ ...a, checked: false })))} className="text-slate-400 hover:underline">초기화</button>
-          </div>
-        </div>
-
-        {assets.length === 0 ? (
-          <div className="p-10 text-center">
-            <p className="text-slate-400 text-sm font-semibold">이 강의실에 등록된 기자재가 없습니다.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {assets.map((asset, idx) => (
-              <div
-                key={asset.asset_id}
-                className={`flex items-center gap-3 px-4 py-3 transition-colors ${asset.checked ? 'bg-emerald-50' : 'bg-white'}`}
-              >
-                <button
-                  onClick={() => setAssets((p) => p.map((a, i) => (i === idx ? { ...a, checked: !a.checked } : a)))}
-                  className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all active:scale-90 ${
-                    asset.checked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-sky-400 bg-white'
-                  }`}
-                >
-                  {asset.checked && (
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-
-                <div className="flex-1 min-w-0">
-                  <p className={`font-semibold text-sm truncate ${asset.checked ? 'text-emerald-800 line-through opacity-70' : 'text-slate-800'}`}>
-                    {asset.model_name}
-                  </p>
-                  <p className="text-xs text-slate-400 font-mono">{asset.barcode}</p>
-                </div>
-
-                <select
-                  value={asset.newStatus}
-                  onChange={(e) => setAssets((p) => p.map((a, i) => (i === idx ? { ...a, newStatus: e.target.value } : a)))}
-                  className="shrink-0 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-sky-500 bg-white"
-                >
-                  <option value="정상">정상</option>
-                  <option value="수리요망">수리요망</option>
-                  <option value="수리중">수리중</option>
-                  <option value="폐기">폐기</option>
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
+  /* ── 메인 ── */
+  return (
+    <div className="max-w-lg mx-auto space-y-4 pb-10">
+      {/* 헤더 + 강의실 선택 */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">재물조사</h1>
+        <p className="text-slate-500 text-sm mt-1">담당 강의실을 선택하고 기자재를 점검하세요.</p>
       </div>
 
-      {/* 제출 */}
-      <button
-        onClick={handleSubmit}
-        disabled={submitting || checkedCount === 0}
-        className="w-full py-4 bg-sky-600 text-white font-bold rounded-2xl hover:bg-sky-700 transition disabled:opacity-40 disabled:cursor-not-allowed text-sm shadow-lg active:scale-95"
-      >
-        {submitting ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            처리 중...
-          </span>
-        ) : (
-          `재물조사 완료 제출 (${checkedCount}개 선택됨)`
-        )}
-      </button>
+      {/* 강의실 드롭다운 */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+          강의실 선택
+        </label>
+        <select
+          value={selectedRoomId ?? ''}
+          onChange={async (e) => {
+            await stopScanner();
+            setSelectedRoomId(e.target.value ? parseInt(e.target.value) : null);
+          }}
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 bg-white text-sm font-semibold text-slate-700"
+        >
+          <option value="">강의실을 선택하세요</option>
+          {assignedRooms.map(r => (
+            <option key={r?.room_id} value={r?.room_id}>
+              {(r?.locations as any)?.location_name} — {r?.room_number}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selectedRoomId && (
+        <>
+          {/* 진행 현황 */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-sm font-bold text-slate-700">진행 현황</p>
+              <span className="text-sm font-black text-sky-600">{checkedCount} / {totalCount}개 ({progress}%)</span>
+            </div>
+            <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+              <div className="bg-sky-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+            </div>
+            {checkedCount === totalCount && totalCount > 0 && (
+              <p className="text-emerald-600 text-xs font-bold mt-2 text-center">모든 기자재 점검 완료!</p>
+            )}
+          </div>
+
+          {/* 카메라 스캐너 */}
+          <div className="space-y-3">
+            <div className="rounded-2xl overflow-hidden shadow-xl border-4 border-white bg-black" style={{ aspectRatio: '4/3' }}>
+              <div id={SCANNER_ID} className="w-full" style={{ minHeight: '260px' }} />
+            </div>
+
+            <div className={`p-3 rounded-xl transition-all ${scanMsgStyle[scanMsg.type]}`}>
+              <p className="text-sm font-bold">{scanMsg.msg}</p>
+            </div>
+
+            {/* 바코드 직접 입력 + 자동완성 */}
+            <div className="relative">
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  value={barcodeInput}
+                  onChange={(e) => {
+                    setBarcodeInput(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && barcodeInput.trim()) {
+                      checkByBarcode(barcodeInput.trim());
+                      setBarcodeInput('');
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-base font-mono transition"
+                  placeholder="바코드/모델명 입력 후 Enter"
+                />
+                <button
+                  onClick={() => {
+                    if (barcodeInput.trim()) {
+                      checkByBarcode(barcodeInput.trim());
+                      setBarcodeInput('');
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-900 transition shrink-0"
+                >
+                  확인
+                </button>
+              </div>
+
+              {/* 자동완성 드롭다운 */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-20 top-full left-0 right-12 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  {suggestions.map((asset) => (
+                    <button
+                      key={asset.asset_id}
+                      onMouseDown={() => {
+                        checkByBarcode(asset.barcode);
+                        setBarcodeInput('');
+                        setShowSuggestions(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-sky-50 transition text-left ${
+                        asset.checked ? 'opacity-40' : ''
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800 truncate">{asset.model_name}</p>
+                        <p className="text-xs text-slate-400 font-mono">{asset.barcode}</p>
+                      </div>
+                      {asset.checked && (
+                        <svg className="w-4 h-4 text-emerald-500 shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 기자재 체크리스트 */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">기자재 목록</h2>
+              <div className="flex gap-2 text-xs font-bold">
+                <button onClick={() => setAssets(p => p.map(a => ({ ...a, checked: true })))} className="text-sky-600 hover:underline">전체선택</button>
+                <span className="text-slate-300">|</span>
+                <button onClick={() => setAssets(p => p.map(a => ({ ...a, checked: false })))} className="text-slate-400 hover:underline">초기화</button>
+              </div>
+            </div>
+
+            {loadingAssets ? (
+              <div className="p-8 flex justify-center">
+                <div className="w-6 h-6 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin" />
+              </div>
+            ) : assets.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-slate-400 text-sm font-semibold">이 강의실에 등록된 기자재가 없습니다.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {assets.map((asset, idx) => (
+                  <div
+                    key={asset.asset_id}
+                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${asset.checked ? 'bg-emerald-50' : 'bg-white'}`}
+                  >
+                    <button
+                      onClick={() => setAssets(p => p.map((a, i) => i === idx ? { ...a, checked: !a.checked } : a))}
+                      className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all active:scale-90 ${
+                        asset.checked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-sky-400 bg-white'
+                      }`}
+                    >
+                      {asset.checked && (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-semibold text-sm truncate ${asset.checked ? 'text-emerald-800 line-through opacity-70' : 'text-slate-800'}`}>
+                        {asset.model_name}
+                      </p>
+                      <p className="text-xs text-slate-400 font-mono">{asset.barcode}</p>
+                    </div>
+
+                    <select
+                      value={asset.newStatus}
+                      onChange={(e) => setAssets(p => p.map((a, i) => i === idx ? { ...a, newStatus: e.target.value } : a))}
+                      className="shrink-0 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-sky-500 bg-white"
+                    >
+                      <option value="정상">정상</option>
+                      <option value="수리요망">수리요망</option>
+                      <option value="수리중">수리중</option>
+                      <option value="폐기">폐기</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 제출 */}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || checkedCount === 0}
+            className="w-full py-4 bg-sky-600 text-white font-bold rounded-2xl hover:bg-sky-700 transition disabled:opacity-40 disabled:cursor-not-allowed text-sm shadow-lg active:scale-95"
+          >
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                처리 중...
+              </span>
+            ) : `재물조사 완료 제출 (${checkedCount}개 선택됨)`}
+          </button>
+        </>
+      )}
     </div>
   );
 }
