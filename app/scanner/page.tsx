@@ -100,22 +100,40 @@ export default function ScannerPage() {
     }
   }, [checkByBarcode, stopScanner]);
 
-  // 배정된 강의실 목록 로드
+  // 배정된 강의실 목록 로드 (FK join 대신 두 단계 조회)
   const fetchAssignedRooms = useCallback(async () => {
     if (!user) return;
     setLoadingRoom(true);
-    const { data } = await supabase
+
+    // 1단계: 배정된 room_id 목록
+    const { data: assignData } = await supabase
       .from('work_room_assignment')
-      .select('room_id, room:room_id(room_id, room_number, locations:location_id(location_name))')
+      .select('room_id')
       .eq('student_id', user.userId)
       .order('assigned_at', { ascending: true });
 
-    const rooms = (data || []).map(d => d.room);
+    if (!assignData || assignData.length === 0) {
+      setAssignedRooms([]);
+      setLoadingRoom(false);
+      return;
+    }
+
+    const roomIds = assignData.map(d => d.room_id);
+
+    // 2단계: room 정보 별도 조회
+    const { data: roomData } = await supabase
+      .from('room')
+      .select('room_id, room_number, locations:location_id(location_name)')
+      .in('room_id', roomIds);
+
+    const rooms = (roomData || []).sort(
+      (a, b) => roomIds.indexOf(a.room_id) - roomIds.indexOf(b.room_id)
+    );
     setAssignedRooms(rooms);
 
     // 강의실이 1개면 자동 선택
     if (rooms.length === 1) {
-      setSelectedRoomId((rooms[0] as any)?.room_id ?? null);
+      setSelectedRoomId(rooms[0].room_id);
     }
     setLoadingRoom(false);
   }, [user]);
@@ -150,6 +168,7 @@ export default function ScannerPage() {
 
   useEffect(() => {
     if (selectedRoomId) {
+      stopScanner(); // 이전 스캐너 정지
       fetchRoomAssets(selectedRoomId);
     }
   }, [selectedRoomId]);
@@ -265,8 +284,7 @@ export default function ScannerPage() {
         </label>
         <select
           value={selectedRoomId ?? ''}
-          onChange={async (e) => {
-            await stopScanner();
+          onChange={(e) => {
             setSelectedRoomId(e.target.value ? parseInt(e.target.value) : null);
           }}
           className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 bg-white text-sm font-semibold text-slate-700"
