@@ -436,102 +436,125 @@ export default function AdminPage() {
           )}
         </div>
       ) : (
-        /* Table View (전체 / 대여용 tab) */
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {(filter === '대여용' ? rentalAssets : allAssetsFiltered).length === 0 ? (
-            <div className="p-16 text-center text-slate-400">
+        /* 전체 / 대여용 탭 */
+        (() => {
+          const list = filter === '대여용' ? rentalAssets : allAssetsFiltered;
+          if (list.length === 0) return (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 text-center text-slate-400">
               해당 조건의 자산이 없습니다.
             </div>
-          ) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">유형</th>
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {filter === '대여용' ? '학과' : '위치 / 학과'}
-                  </th>
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">모델명</th>
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">상태</th>
-                  {filter === '대여용' && (
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      대여 현황
-                    </th>
-                  )}
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">관리</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(filter === '대여용' ? rentalAssets : allAssetsFiltered).map((asset) => (
-                  <tr key={asset.asset_id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                          asset.is_rentable
-                            ? 'bg-sky-100 text-sky-700'
-                            : 'bg-violet-100 text-violet-700'
-                        }`}
-                      >
-                        {asset.is_rentable ? '대여용' : '고정'}
-                      </span>
-                    </td>
-                    <td className="p-4 text-sm text-slate-600">
-                      {asset.is_rentable
-                        ? asset.department || '미지정'
-                        : asset.room
-                        ? `${asset.room.locations?.location_name || ''} ${asset.room.room_number || ''}`.trim()
-                        : '미지정'}
-                    </td>
-                    <td className="p-4 font-semibold text-slate-800 text-sm">{asset.model_name}</td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                          STATUS_STYLE[asset.status] ?? 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {asset.status}
-                      </span>
-                    </td>
-                    {filter === '대여용' && (
-                      <td className="p-4">
-                        {isRented(asset.rentals) ? (
-                          <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">
-                            대여중
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                            대여가능
+          );
+          return (
+            <>
+              {/* ── 모바일 카드 뷰 (md 미만) ── */}
+              <div className="md:hidden space-y-3">
+                {list.map(asset => (
+                  <div key={asset.asset_id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                    {/* 상단: 배지 세로 + 모델명 */}
+                    <div className="flex items-start gap-3">
+                      {/* 유형 + 상태 세로 배치 */}
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold text-center ${asset.is_rentable ? 'bg-sky-100 text-sky-700' : 'bg-violet-100 text-violet-700'}`}>
+                          {asset.is_rentable ? '대여용' : '고정'}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold text-center ${STATUS_STYLE[asset.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                          {asset.status}
+                        </span>
+                        {filter === '대여용' && (
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold text-center ${isRented(asset.rentals) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {isRented(asset.rentals) ? '대여중' : '가능'}
                           </span>
                         )}
-                      </td>
-                    )}
-                    <td className="p-4">
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={() => setPhotoModal({ open: true, url: asset.asset_image || null, name: asset.model_name, assetId: asset.asset_id })}
-                          className="px-2.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition"
-                        >
-                          사진
-                        </button>
-                        <button
-                          onClick={() => openEditModal(asset)}
-                          className="px-2.5 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-xs font-bold hover:bg-sky-100 transition"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => handleDelete(asset.asset_id)}
-                          className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition"
-                        >
-                          삭제
-                        </button>
                       </div>
-                    </td>
-                  </tr>
+                      {/* 텍스트 정보 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-800 text-sm leading-snug">{asset.model_name}</p>
+                        <p className="text-xs text-slate-400 font-mono mt-0.5">{asset.barcode}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {asset.is_rentable
+                            ? asset.department || '미지정'
+                            : asset.room
+                              ? `${asset.room.locations?.location_name || ''} ${asset.room.room_number || ''}`.trim()
+                              : '미지정'}
+                        </p>
+                      </div>
+                    </div>
+                    {/* 하단: 관리 버튼 */}
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={() => setPhotoModal({ open: true, url: asset.asset_image || null, name: asset.model_name, assetId: asset.asset_id })}
+                        className="flex-1 py-2 bg-slate-50 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-100 transition">사진</button>
+                      <button onClick={() => openEditModal(asset)}
+                        className="flex-1 py-2 bg-sky-50 text-sky-600 rounded-xl text-xs font-bold hover:bg-sky-100 transition">수정</button>
+                      <button onClick={() => handleDelete(asset.asset_id)}
+                        className="flex-1 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition">삭제</button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+              </div>
+
+              {/* ── 데스크탑 테이블 뷰 (md 이상) ── */}
+              <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">유형</th>
+                      <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        {filter === '대여용' ? '학과' : '위치 / 학과'}
+                      </th>
+                      <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">모델명</th>
+                      <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">상태</th>
+                      {filter === '대여용' && (
+                        <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">대여 현황</th>
+                      )}
+                      <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {list.map(asset => (
+                      <tr key={asset.asset_id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${asset.is_rentable ? 'bg-sky-100 text-sky-700' : 'bg-violet-100 text-violet-700'}`}>
+                            {asset.is_rentable ? '대여용' : '고정'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm text-slate-600">
+                          {asset.is_rentable
+                            ? asset.department || '미지정'
+                            : asset.room
+                              ? `${asset.room.locations?.location_name || ''} ${asset.room.room_number || ''}`.trim()
+                              : '미지정'}
+                        </td>
+                        <td className="p-4 font-semibold text-slate-800 text-sm">{asset.model_name}</td>
+                        <td className="p-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${STATUS_STYLE[asset.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                            {asset.status}
+                          </span>
+                        </td>
+                        {filter === '대여용' && (
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isRented(asset.rentals) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {isRented(asset.rentals) ? '대여중' : '대여가능'}
+                            </span>
+                          </td>
+                        )}
+                        <td className="p-4">
+                          <div className="flex gap-1.5">
+                            <button onClick={() => setPhotoModal({ open: true, url: asset.asset_image || null, name: asset.model_name, assetId: asset.asset_id })}
+                              className="px-2.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition">사진</button>
+                            <button onClick={() => openEditModal(asset)}
+                              className="px-2.5 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-xs font-bold hover:bg-sky-100 transition">수정</button>
+                            <button onClick={() => handleDelete(asset.asset_id)}
+                              className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition">삭제</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()
       )}
 
       {/* Photo Modal */}
