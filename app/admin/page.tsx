@@ -21,9 +21,10 @@ export default function AdminPage() {
   const [filter, setFilter] = useState('전체');
   // 로그인한 사용자의 담당 학과 정보
   const [myDept, setMyDept] = useState<{ id: number | null; name: string | null }>({ id: null, name: null });
-  const [selectedDept, setSelectedDept] = useState('전체');
+  const [selectedDept, setSelectedDept]         = useState('전체');
+  const [selectedCategory, setSelectedCategory] = useState('전체');
   const [selectedLocation, setSelectedLocation] = useState('전체');
-  const [selectedRoom, setSelectedRoom] = useState('전체');
+  const [selectedRoom, setSelectedRoom]         = useState('전체');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [editForm, setEditForm] = useState({ room_id: '', status: '' });
@@ -206,9 +207,16 @@ export default function AdminPage() {
     return ['전체', ...Array.from(new Set(filtered.map((a) => a.room?.room_number || '미지정')))];
   }, [visibleAssets, selectedLocation]);
 
-  const rentalAssets = visibleAssets.filter(
-    (a) => a.is_rentable && (selectedDept === '전체' || a.department === selectedDept)
-  );
+  const rentalCategories = useMemo(() => {
+    const cats = visibleAssets.filter(a => a.is_rentable).map(a => a.category || '기타');
+    return ['전체', ...Array.from(new Set(cats)).sort()];
+  }, [visibleAssets]);
+
+  const rentalAssets = useMemo(() => visibleAssets.filter(a =>
+    a.is_rentable &&
+    (selectedDept === '전체' || a.department === selectedDept) &&
+    (selectedCategory === '전체' || (a.category || '기타') === selectedCategory)
+  ), [visibleAssets, selectedDept, selectedCategory]);
 
   const allAssetsFiltered = visibleAssets.filter((a) => {
     if (filter === '대여용') return a.is_rentable;
@@ -289,15 +297,43 @@ export default function AdminPage() {
       {filter !== '전체' && (
         <div className="flex flex-wrap gap-4 p-4 bg-sky-50 rounded-xl border border-sky-100">
           {filter === '대여용' && (
-            <div>
-              <label className="block text-xs font-bold text-sky-600 mb-1">관리 학과</label>
-              <select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-sky-200 text-sm outline-none bg-white focus:border-sky-500"
-              >
-                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
+            <div className="flex flex-col gap-3 w-full">
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-sky-600 mb-1">관리 학과</label>
+                  <select
+                    value={selectedDept}
+                    onChange={(e) => { setSelectedDept(e.target.value); setSelectedCategory('전체'); }}
+                    className="px-3 py-2 rounded-lg border border-sky-200 text-sm outline-none bg-white focus:border-sky-500"
+                  >
+                    {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* 카테고리 칩 필터 */}
+              <div>
+                <label className="block text-xs font-bold text-sky-600 mb-2">카테고리</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {rentalCategories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        selectedCategory === cat
+                          ? 'bg-sky-600 text-white shadow-sm'
+                          : 'bg-white border border-sky-200 text-sky-700 hover:border-sky-400'
+                      }`}
+                    >
+                      {cat}
+                      {cat !== '전체' && (
+                        <span className="ml-1 opacity-70">
+                          {visibleAssets.filter(a => a.is_rentable && (a.category || '기타') === cat && (selectedDept === '전체' || a.department === selectedDept)).length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
           {filter === '고정' && (
