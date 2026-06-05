@@ -95,8 +95,9 @@ function Sidebar() {
         {isAdmin && <NavLink href="/" label="홈 대시보드" onClick={onClose} />}
         {!isAdmin && (
           <>
-            <NavLink href="/rentals" label="기자재 대여/반납" onClick={onClose} />
-            <NavLink href="/fault-report" label="고장 신고" color="text-red-400" onClick={onClose} />
+            <NavLink href="/rentals"    label="기자재 대여 신청" onClick={onClose} />
+            <NavLink href="/my-rentals" label="나의 대여 현황"   color="text-emerald-400" onClick={onClose} />
+            <NavLink href="/fault-report" label="고장 신고"      color="text-red-400" onClick={onClose} />
           </>
         )}
         {isWorker && (
