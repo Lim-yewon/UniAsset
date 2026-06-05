@@ -278,13 +278,29 @@ export default function ScannerPage() {
     if (!window.confirm(`${checkedCount}개 기자재의 재물조사를 완료 처리하시겠습니까?`)) return;
     setSubmitting(true);
     stopScanner();
-    await Promise.all(
-      assets.filter(a => a.checked).map(a =>
+
+    const checkedAssets = assets.filter(a => a.checked);
+    const now = new Date().toISOString();
+
+    await Promise.all([
+      // 자산 상태 업데이트
+      ...checkedAssets.map(a =>
         supabase.from('assets')
-          .update({ status: a.newStatus === '정상' ? '점검완료' : a.newStatus, last_inspected_at: new Date().toISOString(), last_inspector_id: user?.userId })
+          .update({ status: a.newStatus === '정상' ? '점검완료' : a.newStatus, last_inspected_at: now, last_inspector_id: user?.userId })
           .eq('asset_id', a.asset_id)
-      )
-    );
+      ),
+      // 재물조사 이력 기록
+      supabase.from('inspection_log').insert(
+        checkedAssets.map(a => ({
+          asset_id:     a.asset_id,
+          inspector_id: user?.userId,
+          room_id:      selectedRoomId,
+          status:       a.newStatus === '정상' ? '점검완료' : a.newStatus,
+          inspected_at: now,
+        }))
+      ),
+    ]);
+
     setSubmittedCount(checkedCount);
     setSubmitting(false);
     setDone(true);

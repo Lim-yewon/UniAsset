@@ -19,8 +19,15 @@ export default function AdminRentalsPage() {
   const [rentals, setRentals]     = useState<RentalRow[]>([]);
   const [loading, setLoading]     = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [myDeptName, setMyDeptName] = useState<string | null>(null);
-  const [photoModal, setPhotoModal] = useState<{ open: boolean; url: string | null; name: string }>({ open: false, url: null, name: '' });
+  const [myDeptName, setMyDeptName]       = useState<string | null>(null);
+  const [dueDateMap, setDueDateMap]       = useState<Record<number, string>>({});
+  const [photoModal, setPhotoModal]       = useState<{ open: boolean; url: string | null; name: string }>({ open: false, url: null, name: '' });
+
+  const defaultDueDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  };
 
   useEffect(() => {
     if (user) init();
@@ -51,7 +58,16 @@ export default function AdminRentalsPage() {
       .in('status', ['대여신청', '반납신청'])
       .order('rental_date', { ascending: true });
     if (error) console.error(error);
-    setRentals((data as any) || []);
+    const rows = (data as any) || [];
+    setRentals(rows);
+    // 새 대여신청에 기본 반납 기한 설정
+    setDueDateMap(prev => {
+      const next = { ...prev };
+      rows.filter((r: any) => r.status === '대여신청').forEach((r: any) => {
+        if (!next[r.rental_id]) next[r.rental_id] = defaultDueDate();
+      });
+      return next;
+    });
     setLoading(false);
   };
 
@@ -65,9 +81,10 @@ export default function AdminRentalsPage() {
 
   // ── 대여 신청 승인 ──
   const approveRental = async (rentalId: number) => {
-    if (!window.confirm('대여 신청을 승인하시겠습니까?')) return;
+    const dueDate = dueDateMap[rentalId] || defaultDueDate();
+    if (!window.confirm(`대여 신청을 승인하시겠습니까?\n반납 기한: ${dueDate}`)) return;
     setActionLoading(`approve_${rentalId}`);
-    await supabase.from('rentals').update({ status: '대여중' }).eq('rental_id', rentalId);
+    await supabase.from('rentals').update({ status: '대여중', due_date: dueDate }).eq('rental_id', rentalId);
     setActionLoading(null);
     fetchRentals();
   };
@@ -149,6 +166,20 @@ export default function AdminRentalsPage() {
             </p>
           </div>
         </div>
+
+        {/* 반납 기한 설정 (대여신청만) */}
+        {type === 'request' && (
+          <div className="mt-3 flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+            <label className="text-xs font-bold text-slate-500 shrink-0">반납 기한</label>
+            <input
+              type="date"
+              value={dueDateMap[rental.rental_id] || defaultDueDate()}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={e => setDueDateMap(prev => ({ ...prev, [rental.rental_id]: e.target.value }))}
+              className="flex-1 text-sm font-semibold text-slate-700 bg-transparent outline-none"
+            />
+          </div>
+        )}
 
         {/* 버튼 */}
         <div className="flex gap-2 mt-3">

@@ -19,6 +19,7 @@ export default function AdminFaultsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
   const [deptLabel, setDeptLabel] = useState<string | null>(null);
+  const [imgModal, setImgModal] = useState<{ open: boolean; url: string; barcode: string }>({ open: false, url: '', barcode: '' });
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -144,81 +145,105 @@ export default function AdminFaultsPage() {
           <p className="text-sm text-slate-400 mt-1">모든 기자재가 정상 작동 중입니다.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  바코드
-                </th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  고장 내용
-                </th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  신고 일시
-                </th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  상태
-                </th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  처리
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {reports.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 font-mono text-sm font-semibold text-slate-700">
-                    {r.barcode}
-                  </td>
-                  <td className="p-4 text-sm text-slate-600 max-w-xs">
-                    <p className="line-clamp-2">{r.reason}</p>
-                  </td>
-                  <td className="p-4 text-sm text-slate-500 whitespace-nowrap">
-                    {r.reported_at
-                      ? new Date(r.reported_at).toLocaleString('ko-KR', {
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '-'}
-                  </td>
-                  <td className="p-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                        STATUS_STYLE[r.status as FaultStatus] ?? 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={r.status}
-                        onChange={(e) => handleStatusChange(r.id, e.target.value)}
-                        className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white outline-none focus:border-sky-500 cursor-pointer"
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => saveStatus(r.id)}
-                        disabled={saving === r.id}
-                        className="bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-sky-700 transition disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {saving === r.id ? '...' : '저장'}
-                      </button>
-                    </div>
-                  </td>
+        <>
+          {/* ── 모바일 카드 ── */}
+          <div className="md:hidden space-y-3">
+            {reports.map(r => (
+              <div key={r.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${STATUS_STYLE[r.status as FaultStatus] ?? 'bg-slate-100 text-slate-600'}`}>{r.status}</span>
+                    <p className="font-mono text-sm font-bold text-slate-700 mt-1">{r.barcode}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {r.reported_at ? new Date(r.reported_at).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-'}
+                    </p>
+                  </div>
+                  {r.fault_image && (
+                    <button onClick={() => setImgModal({ open: true, url: r.fault_image, barcode: r.barcode })}
+                      className="shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
+                      <img src={r.fault_image} alt="고장사진" className="w-full h-full object-cover" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{r.reason}</p>
+                <div className="flex gap-2">
+                  <select value={r.status} onChange={e => handleStatusChange(r.id, e.target.value)}
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:border-sky-500">
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <button onClick={() => saveStatus(r.id)} disabled={saving === r.id}
+                    className="px-4 py-2 bg-sky-600 text-white rounded-xl text-sm font-bold hover:bg-sky-700 transition disabled:opacity-50">
+                    {saving === r.id ? '...' : '저장'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── 데스크탑 테이블 ── */}
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">사진</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">바코드</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">고장 내용</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">신고 일시</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">상태</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">처리</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {reports.map(r => (
+                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4">
+                      {r.fault_image ? (
+                        <button onClick={() => setImgModal({ open: true, url: r.fault_image, barcode: r.barcode })}
+                          className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 hover:border-sky-300 transition">
+                          <img src={r.fault_image} alt="고장사진" className="w-full h-full object-cover" />
+                        </button>
+                      ) : <span className="text-slate-300 text-xs">없음</span>}
+                    </td>
+                    <td className="p-4 font-mono text-sm font-semibold text-slate-700">{r.barcode}</td>
+                    <td className="p-4 text-sm text-slate-600 max-w-xs"><p className="line-clamp-2">{r.reason}</p></td>
+                    <td className="p-4 text-sm text-slate-500 whitespace-nowrap">
+                      {r.reported_at ? new Date(r.reported_at).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-'}
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${STATUS_STYLE[r.status as FaultStatus] ?? 'bg-slate-100 text-slate-600'}`}>{r.status}</span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <select value={r.status} onChange={e => handleStatusChange(r.id, e.target.value)}
+                          className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white outline-none focus:border-sky-500 cursor-pointer">
+                          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <button onClick={() => saveStatus(r.id)} disabled={saving === r.id}
+                          className="bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-sky-700 transition disabled:opacity-50 whitespace-nowrap">
+                          {saving === r.id ? '...' : '저장'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* 사진 모달 */}
+      {imgModal.open && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setImgModal({ open: false, url: '', barcode: '' })}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 text-sm">고장 사진 — {imgModal.barcode}</h3>
+              <button onClick={() => setImgModal({ open: false, url: '', barcode: '' })} className="p-1.5 rounded-lg hover:bg-slate-100 transition text-slate-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <img src={imgModal.url} alt="고장 사진" className="w-full object-contain max-h-96" />
+          </div>
         </div>
       )}
     </div>

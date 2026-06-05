@@ -121,6 +121,7 @@ function Sidebar() {
             <NavLink href="/admin" label="자산 관리 대장" color="text-violet-400" onClick={onClose} />
             <NavLink href="/admin/rentals" label="대여 신청 관리" color="text-amber-400" onClick={onClose} />
             <NavLink href="/admin/faults" label="고장 신고 관리" color="text-red-400" onClick={onClose} />
+            <NavLink href="/admin/inspections" label="재물조사 이력" color="text-teal-400" onClick={onClose} />
             <NavLink href="/auth-manage" label="권한 및 근로 배정" color="text-slate-400" onClick={onClose} />
           </>
         )}

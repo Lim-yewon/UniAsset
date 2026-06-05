@@ -22,7 +22,7 @@ export default function MyRentalsPage() {
   const fetchRentals = async () => {
     const { data } = await supabase
       .from('rentals')
-      .select('rental_id, status, rental_date, return_date, assets(asset_id, model_name, department, asset_image, category, barcode)')
+      .select('rental_id, status, rental_date, return_date, due_date, assets(asset_id, model_name, department, asset_image, category, barcode)')
       .eq('user_id', user!.userId)
       .in('status', ['대여중', '반납신청', '반납완료'])
       .order('rental_date', { ascending: false });
@@ -149,25 +149,38 @@ export default function MyRentalsPage() {
                 </svg>
                 <p className="text-xs text-emerald-700 font-medium">반납 시 <strong>반납 신청</strong> 버튼을 눌러 관리자 승인을 요청하세요.</p>
               </div>
-              {rentingList.map(rental => (
+              {rentingList.map(rental => {
+                const today     = new Date().toISOString().split('T')[0];
+                const dueDate   = rental.due_date as string | null;
+                const isOverdue = dueDate && dueDate < today;
+                const daysLeft  = dueDate ? Math.ceil((new Date(dueDate).getTime() - new Date(today).getTime()) / 86400000) : null;
+                return (
                 <AssetCard key={rental.rental_id} rental={rental}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[11px] font-bold">대여 중</span>
                     <span className="text-xs text-slate-400">{new Date(rental.rental_date).toLocaleDateString('ko-KR')} 대여 시작</span>
                   </div>
+                  {dueDate && (
+                    <div className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-lg ${isOverdue ? 'bg-red-50 border border-red-200' : (daysLeft !== null && daysLeft <= 3) ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50 border border-slate-200'}`}>
+                      <span className={`text-[11px] font-bold ${isOverdue ? 'text-red-600' : (daysLeft !== null && daysLeft <= 3) ? 'text-amber-600' : 'text-slate-500'}`}>
+                        {isOverdue ? `반납 기한 ${Math.abs(daysLeft!)}일 초과` : daysLeft === 0 ? '오늘 반납 기한' : `반납 기한 D-${daysLeft} (${new Date(dueDate).toLocaleDateString('ko-KR')})`}
+                      </span>
+                    </div>
+                  )}
                   <button
                     onClick={() => handleReturnRequest(rental.rental_id)}
                     disabled={actionLoading === String(rental.rental_id)}
-                    className="mt-3 w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition disabled:opacity-50 active:scale-95"
+                    className={`mt-3 w-full py-2.5 text-white rounded-xl text-sm font-bold transition disabled:opacity-50 active:scale-95 ${isOverdue ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'}`}
                   >
                     {actionLoading === String(rental.rental_id) ? (
                       <span className="flex items-center justify-center gap-2">
                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />처리 중...
                       </span>
-                    ) : '반납 신청'}
+                    ) : isOverdue ? '즉시 반납 신청 (연체)' : '반납 신청'}
                   </button>
                 </AssetCard>
-              ))}
+                );
+              })}
             </>
           )}
         </div>
