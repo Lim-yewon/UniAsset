@@ -31,17 +31,19 @@ export default function ScannerPage() {
   const [cameraError, setCameraError]       = useState<string | null>(null);
 
   // ── refs ──────────────────────────────────────────────────────────────────
-  const videoRef        = useRef<HTMLVideoElement>(null);
-  const canvasRef       = useRef<HTMLCanvasElement>(null);
-  const streamRef       = useRef<MediaStream | null>(null);
-  const animFrameRef    = useRef<number>(0);
-  const detectorRef     = useRef<any>(null);
-  const jsQRRef         = useRef<any>(null);
-  const scanningRef     = useRef(false);
-  const lastScanRef     = useRef('');
-  const lastScanTimeRef = useRef(0);
-  const flashTORef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef        = useRef<HTMLInputElement>(null);
+  const videoRef           = useRef<HTMLVideoElement>(null);
+  const canvasRef          = useRef<HTMLCanvasElement>(null);
+  const streamRef          = useRef<MediaStream | null>(null);
+  const animFrameRef       = useRef<number>(0);
+  const detectorRef        = useRef<any>(null);   // BarcodeDetector (iOS17+/Chrome)
+  const quaggaRef          = useRef<any>(null);   // quagga2 폴백 (1D 바코드)
+  const quaggaBusyRef      = useRef(false);       // quagga 중복 호출 방지
+  const lastQuaggaCallRef  = useRef(0);           // 쓰로틀 타임스탬프
+  const scanningRef        = useRef(false);
+  const lastScanRef        = useRef('');
+  const lastScanTimeRef    = useRef(0);
+  const flashTORef         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef           = useRef<HTMLInputElement>(null);
 
   // ── 자동완성 ──────────────────────────────────────────────────────────────
   const suggestions = useMemo(() => {
@@ -89,7 +91,7 @@ export default function ScannerPage() {
   }, []);
 
   // ── 스캐너 시작 ───────────────────────────────────────────────────────────
-  // 전략: ① BarcodeDetector API (Chrome/Android/Safari 17+) → ② jsQR (QR 폴백)
+  // 전략: ① BarcodeDetector API (iOS 17+/Chrome) → ② quagga2 (1D 바코드 폴백)
   const startScanner = useCallback(async () => {
     stopScanner();
     setCameraError(null);
@@ -128,10 +130,10 @@ export default function ScannerPage() {
       }
     }
 
-    // 3. jsQR 폴백 로드
-    if (!detectorRef.current && !jsQRRef.current) {
-      const mod = await import('jsqr');
-      jsQRRef.current = mod.default;
+    // 3. quagga2 폴백 로드 — 1D 바코드(Code128 등) 지원 (BarcodeDetector 없는 경우)
+    if (!detectorRef.current && !quaggaRef.current) {
+      const mod = await import('@ericblade/quagga2');
+      quaggaRef.current = mod.default;
     }
 
     // 4. 스캔 루프 (requestAnimationFrame)
@@ -157,14 +159,46 @@ export default function ScannerPage() {
 
       try {
         let code: string | null = null;
+
         if (detectorRef.current) {
+          // ① BarcodeDetector (iOS 17+ / Chrome Android) — 빠름, 1D 포함
           const hits = await detectorRef.current.detect(canvas);
           if (hits.length) code = hits[0].rawValue;
-        } else if (jsQRRef.current) {
-          const imgData = ctx.getImageData(0, 0, w, h);
-          const hit = jsQRRef.current(imgData.data, w, h, { inversionAttempts: 'dontInvert' });
-          if (hit) code = hit.data;
+
+        } else if (quaggaRef.current && !quaggaBusyRef.current) {
+          // ② quagga2 — 1D 바코드 전용 폴백 (iOS 16 이하)
+          // 250ms 쓰로틀 + 640px 리사이즈로 성능 최적화
+          const now = Date.now();
+          if (now - lastQuaggaCallRef.current >= 250) {
+            lastQuaggaCallRef.current = now;
+            quaggaBusyRef.current = true;
+
+            const PROC_W = 640;
+            const scale = Math.min(PROC_W / w, 1);
+            const pw = Math.floor(w * scale);
+            const ph = Math.floor(h * scale);
+            const pc = document.createElement('canvas');
+            pc.width = pw; pc.height = ph;
+            pc.getContext('2d')?.drawImage(canvas, 0, 0, pw, ph);
+            const dataUrl = pc.toDataURL('image/jpeg', 0.8);
+
+            quaggaRef.current.decodeSingle(
+              {
+                src: dataUrl,
+                numOfWorkers: 0,
+                locate: true,
+                decoder: {
+                  readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader', 'upc_reader'],
+                },
+              },
+              (result: any) => {
+                quaggaBusyRef.current = false;
+                if (result?.codeResult?.code) checkByBarcode(result.codeResult.code);
+              }
+            );
+          }
         }
+
         if (code) checkByBarcode(code);
       } catch {}
 
