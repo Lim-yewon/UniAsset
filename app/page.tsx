@@ -14,6 +14,7 @@ export default function HomePage() {
   const [pendingReturn,  setPendingReturn]  = useState(0);
   const [pendingFault,   setPendingFault]   = useState(0);
   const [overdueRentals, setOverdueRentals] = useState(0);
+  const [agingCount,     setAgingCount]     = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -23,7 +24,15 @@ export default function HomePage() {
         supabase.from('rentals').select('status, due_date').in('status', ['대여신청', '반납신청', '대여중']),
         supabase.from('fault_reports').select('id').eq('status', '접수대기'),
       ]);
-      if (assetData) setAssets(assetData);
+      if (assetData) {
+        setAssets(assetData);
+        const aging = assetData.filter((a: any) => {
+          if (!a.intro_date) return false;
+          const yrs = (Date.now() - new Date(a.intro_date).getTime()) / (365.25 * 86400000);
+          return yrs >= 3;
+        }).length;
+        setAgingCount(aging);
+      }
 
       if (rentalData) {
         setPendingRental(rentalData.filter(r => r.status === '대여신청').length);
@@ -80,7 +89,7 @@ export default function HomePage() {
     { label: '고장 / 노후', value: totalFaulty,                                    sub: '수리요망 + 수리중 + 폐기', bg: 'bg-red-50 border-red-100',      valueColor: 'text-red-700' },
   ];
 
-  const totalPending = pendingRental + pendingReturn + pendingFault;
+  const totalPending = pendingRental + pendingReturn + pendingFault + (agingCount > 0 ? 1 : 0);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -135,6 +144,13 @@ export default function HomePage() {
                 <span className="text-2xl font-black text-rose-600">{overdueRentals}</span>
                 <span className="text-xs font-semibold text-rose-600">반납 기한 초과</span>
                 <span className="text-[11px] text-rose-400 group-hover:underline">확인하러 가기 →</span>
+              </Link>
+            )}
+            {agingCount > 0 && (
+              <Link href="/admin/stats" className="flex flex-col gap-1 p-3 bg-amber-50 rounded-xl border border-amber-100 hover:border-amber-300 transition group">
+                <span className="text-2xl font-black text-amber-600">{agingCount}</span>
+                <span className="text-xs font-semibold text-amber-600">노후화 자산</span>
+                <span className="text-[11px] text-amber-400 group-hover:underline">노후 현황 보기 →</span>
               </Link>
             )}
           </div>
