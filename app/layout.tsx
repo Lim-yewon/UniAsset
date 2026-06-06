@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
+import Chatbot from '../components/Chatbot';
 
 function NavLink({
   href,
@@ -218,6 +219,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 bg-slate-50">
         <div className="p-4 md:p-8">{children}</div>
       </main>
+      <Chatbot />
     </div>
   );
 }
